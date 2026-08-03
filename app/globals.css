@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  /* Darkroom palette — warm near-black so prints glow, not glare */
+  --color-ink: #16130f;
+  --color-ink-raised: #211d17;
+  --color-ivory: #f2ede4;
+  --color-ivory-dim: #a89f90;
+  --color-champagne: #c9a96a;
+
+  --font-display: var(--font-cormorant), "Cormorant Garamond", serif;
+  --font-utility: var(--font-jost), "Jost", sans-serif;
+}
+
+html {
+  background: var(--color-ink);
+  color: var(--color-ivory);
+  scrollbar-gutter: stable;
+}
+
+::selection {
+  background: var(--color-champagne);
+  color: var(--color-ink);
+}
+
+/* Grid tiles reveal a thin inset "mat board" frame on hover */
+.tile {
+  position: relative;
+  overflow: hidden;
+}
+.tile::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-champagne) 70%, transparent);
+  opacity: 0;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+}
+.tile:hover::after,
+.tile:focus-visible::after {
+  opacity: 1;
+}
+.tile img,
+.tile video {
+  transition: transform 700ms cubic-bezier(0.2, 0.6, 0.2, 1), opacity 400ms ease;
+}
+.tile:hover img,
+.tile:hover video {
+  transform: scale(1.02);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile img,
+  .tile video,
+  .tile::after {
+    transition: none;
+  }
+}

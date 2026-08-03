@@ -1,0 +1,9 @@
+services:
+  gallery:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      # Drop full-res photos here — that's the whole CMS.
+      - ./photos:/photos:ro
+    restart: unless-stopped

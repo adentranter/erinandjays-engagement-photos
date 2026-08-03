@@ -28,7 +28,7 @@ uses Next standalone output. Mount your photo directory at `/photos`
 | `/api/photo/:name?size=thumb` | 640px webp for the grid (images) |
 | `/api/photo/:name?size=large` | 2200px webp for the lightbox (images) |
 | `/api/photo/:name?size=original` | Untouched file, download disposition |
-| `/api/download?kind=all\|photos\|video` | Streamed zip of originals (default: all) |
+| `/api/download` | Streamed zip. Optional `?kind=all` (default), `photos`, or `video` |
 
 ## Notes
 
