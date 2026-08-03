@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
-import { Readable } from "node:stream";
 import { NextRequest } from "next/server";
 import sharp from "sharp";
 import {
@@ -9,6 +8,7 @@ import {
   mediaContentType,
   safeMediaPath,
 } from "@/lib/photos";
+import { nodeToWebStream } from "@/lib/stream";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +40,7 @@ export async function GET(
 
     const stream = fs.createReadStream(filePath);
 
-    return new Response(Readable.toWeb(stream) as ReadableStream, {
+    return new Response(nodeToWebStream(stream, req.signal), {
       headers: {
         "Content-Type": mediaContentType(name),
         "Content-Length": String(stat.size),

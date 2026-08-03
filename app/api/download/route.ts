@@ -1,8 +1,9 @@
 import path from "node:path";
-import { PassThrough, Readable } from "node:stream";
+import { PassThrough } from "node:stream";
 import { NextRequest } from "next/server";
 import archiver from "archiver";
 import { getMedia, PHOTOS_DIR, type MediaType } from "@/lib/photos";
+import { nodeToWebStream } from "@/lib/stream";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,22 @@ export async function GET(req: NextRequest) {
 
   const archive = archiver("zip", { store: true }); // JPEGs/MP4s don't compress
   const passthrough = new PassThrough();
+
+  const cleanup = () => {
+    try {
+      archive.abort();
+    } catch {
+      // already finalized/aborted
+    }
+    if (!passthrough.destroyed) passthrough.destroy();
+  };
+
+  if (req.signal.aborted) cleanup();
+  else req.signal.addEventListener("abort", cleanup, { once: true });
+
+  archive.on("error", (err) => {
+    if (!passthrough.destroyed) passthrough.destroy(err);
+  });
   archive.pipe(passthrough);
 
   for (const item of media) {
@@ -51,7 +68,7 @@ export async function GET(req: NextRequest) {
   }
   void archive.finalize();
 
-  return new Response(Readable.toWeb(passthrough) as ReadableStream, {
+  return new Response(nodeToWebStream(passthrough, req.signal), {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${FILENAMES[kind]}"`,
