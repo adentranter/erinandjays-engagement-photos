@@ -1,4 +1,4 @@
-# Erin & Jay — Engagement Gallery
+# Ehrin & Jay — Engagement Gallery
 
 Zero-database photo gallery. The filesystem is the CMS: drop full-resolution
 images and videos into `photos/` and they show up. Next.js 15 / React 19 /
@@ -39,4 +39,4 @@ uses Next standalone output. Mount your photo directory at `/photos`
   cache headers — put Cloudflare in front and it becomes free.
 - No auth by design. If you want it semi-private, Cloudflare Access or
   basic auth at the proxy is less code than Auth.js for a one-page site.
-# erinandjays-engagement-photos
+# ehrinandjays-engagement-photos

@@ -28,7 +28,7 @@ export default async function Home() {
           The engagement of
         </p>
         <h1 className="mt-5 font-display text-6xl font-light italic leading-none sm:text-8xl">
-          Erin <span className="not-italic text-champagne">&amp;</span> Jay
+          Ehrin <span className="not-italic text-champagne">&amp;</span> Jay
         </h1>
         <div
           aria-hidden

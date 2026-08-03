@@ -10,9 +10,9 @@ const KINDS = ["all", "photos", "video"] as const;
 type Kind = (typeof KINDS)[number];
 
 const FILENAMES: Record<Kind, string> = {
-  all: "erin-and-jay-engagement.zip",
-  photos: "erin-and-jay-photos.zip",
-  video: "erin-and-jay-video.zip",
+  all: "ehrin-and-jay-engagement.zip",
+  photos: "ehrin-and-jay-photos.zip",
+  video: "ehrin-and-jay-video.zip",
 };
 
 function parseKind(raw: string | null): Kind {
