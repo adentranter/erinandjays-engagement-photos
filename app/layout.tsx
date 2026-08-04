@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Jost } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const cormorant = Cormorant_Garamond({
@@ -29,7 +30,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${cormorant.variable} ${jost.variable}`}>
-      <body className="min-h-dvh antialiased font-utility">{children}</body>
+      <body className="min-h-dvh antialiased font-utility">
+        {children}
+        <Script
+          defer
+          src="https://analytics.adentranter.com/script.js"
+          data-website-id="ae9fc57d-07ec-4600-aee5-f15943f5fa27"
+          strategy="afterInteractive"
+        />
+      </body>
     </html>
   );
 }
