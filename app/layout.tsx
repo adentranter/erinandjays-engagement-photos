@@ -17,9 +17,9 @@ const jost = Jost({
 });
 
 export const metadata: Metadata = {
-  title: "Ehrin & Jay — Engagement",
+  title: "Ehrin & Jay",
   description:
-    "Engagement photo gallery — Ehrin Osmond-Roche & Jay McKinlay, 28 June 2026, Queens Gardens — North Ward",
+    "Wedding and engagement photographs — Ehrin Osmond-Roche & Jay McKinlay. Guests can share their own photos from the day.",
   robots: { index: false, follow: false },
 };
 

@@ -1,0 +1,32 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "-u",
+        "NODE_ENV",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3123"
+      ],
+      "port": 3123
+    },
+    {
+      "name": "dof-studio",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PORT=7861",
+        "uv",
+        "run",
+        "-p",
+        "3.12",
+        "tools/dof-studio/app.py"
+      ],
+      "port": 7861
+    }
+  ]
+}

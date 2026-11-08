@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { MediaItem } from "@/lib/photos";
+import type { GalleryItem } from "@/lib/gallery-types";
 import { Lightbox } from "@/components/lightbox";
 
-export function Gallery({ media }: { media: MediaItem[] }) {
+export function Gallery({ media }: { media: GalleryItem[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
@@ -12,7 +12,7 @@ export function Gallery({ media }: { media: MediaItem[] }) {
       <div className="columns-1 gap-3 sm:columns-2 lg:columns-3 xl:columns-4">
         {media.map((item, i) => (
           <button
-            key={item.name}
+            key={item.id}
             type="button"
             onClick={() => setOpenIndex(i)}
             className="tile mb-3 block w-full cursor-zoom-in break-inside-avoid focus:outline-none"
@@ -26,12 +26,14 @@ export function Gallery({ media }: { media: MediaItem[] }) {
               <span className="relative block w-full bg-ink-raised">
                 {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                 <video
-                  src={`/api/photo/${encodeURIComponent(item.name)}`}
+                  src={`${item.src}#t=0.1`}
                   muted
                   playsInline
                   preload="metadata"
                   className="h-auto w-full"
-                  style={{ aspectRatio: `${item.width} / ${item.height}` }}
+                  style={{
+                    aspectRatio: `${item.width ?? 16} / ${item.height ?? 9}`,
+                  }}
                 />
                 <span
                   aria-hidden
@@ -53,7 +55,7 @@ export function Gallery({ media }: { media: MediaItem[] }) {
             ) : (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
-                src={`/api/photo/${encodeURIComponent(item.name)}?size=thumb`}
+                src={item.thumb}
                 alt=""
                 width={item.width}
                 height={item.height}
@@ -61,6 +63,11 @@ export function Gallery({ media }: { media: MediaItem[] }) {
                 decoding="async"
                 className="h-auto w-full bg-ink-raised"
               />
+            )}
+            {item.credit && (
+              <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 to-transparent px-3 pt-8 pb-2.5 text-left text-[10px] uppercase tracking-[0.25em] text-ivory/90">
+                {item.credit}
+              </span>
             )}
           </button>
         ))}

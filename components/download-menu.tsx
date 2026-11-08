@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 interface DownloadMenuProps {
+  album: "wedding" | "engagement";
   photoCount: number;
   videoCount: number;
 }
@@ -11,7 +12,6 @@ const OPTIONS = [
   {
     kind: "all",
     label: "All",
-    href: "/api/download?kind=all",
     describe: (p: number, v: number) =>
       `${p + v} file${p + v === 1 ? "" : "s"}`,
     when: (p: number, v: number) => p > 0 || v > 0,
@@ -19,20 +19,19 @@ const OPTIONS = [
   {
     kind: "photos",
     label: "Just photos",
-    href: "/api/download?kind=photos",
     describe: (p: number) => `${p} photograph${p === 1 ? "" : "s"}`,
     when: (p: number) => p > 0,
   },
   {
     kind: "video",
     label: "Video",
-    href: "/api/download?kind=video",
     describe: (_p: number, v: number) => `${v} video${v === 1 ? "" : "s"}`,
     when: (_p: number, v: number) => v > 0,
   },
 ] as const;
 
 export function DownloadMenu({
+  album,
   photoCount,
   videoCount,
 }: Readonly<DownloadMenuProps>) {
@@ -103,7 +102,7 @@ export function DownloadMenu({
             <a
               key={option.kind}
               role="menuitem"
-              href={option.href}
+              href={`/api/download?album=${album}&kind=${option.kind}`}
               onClick={() => setOpen(false)}
               className="flex flex-col gap-0.5 px-4 py-2.5 text-ivory transition-colors hover:bg-champagne/10 hover:text-champagne"
             >

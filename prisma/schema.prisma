@@ -1,0 +1,50 @@
+// Ehrin & Jay gallery — upload metadata. Files live in UploadThing;
+// the engagement shoot's built-in photos live in ./photos.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Album {
+  wedding
+  engagement
+}
+
+enum Role {
+  photographer
+  guest
+}
+
+enum MediaType {
+  image
+  video
+}
+
+model Media {
+  id           String    @id @default(uuid()) @db.Uuid
+  album        Album
+  role         Role
+  uploaderName String?   @map("uploader_name")
+  fileKey      String    @unique @map("file_key")
+  fileName     String    @map("file_name")
+  url          String
+  type         MediaType
+  size         BigInt    @default(0)
+  width        Int?
+  height       Int?
+  thumbUrl     String?   @map("thumb_url")
+  largeUrl     String?   @map("large_url")
+  derivedKeys  String[]  @default([]) @map("derived_keys")
+  hidden       Boolean   @default(false)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([album, createdAt])
+  @@map("media")
+}

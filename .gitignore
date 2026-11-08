@@ -2,3 +2,8 @@ node_modules
 .next
 photos/*
 !photos/.gitkeep
+.env
+.env.local
+
+# DOF Studio exports
+tools/dof-studio/output/

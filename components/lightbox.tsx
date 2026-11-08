@@ -1,20 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import type { MediaItem } from "@/lib/photos";
+import type { GalleryItem } from "@/lib/gallery-types";
 
 interface LightboxProps {
-  media: MediaItem[];
+  media: GalleryItem[];
   index: number;
   onNavigate: (index: number) => void;
   onClose: () => void;
 }
-
-const largeUrl = (name: string) =>
-  `/api/photo/${encodeURIComponent(name)}?size=large`;
-
-const videoUrl = (name: string) =>
-  `/api/photo/${encodeURIComponent(name)}`;
 
 export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
   const item = media[index];
@@ -50,7 +44,7 @@ export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
     [index - 1, index + 1].forEach((i) => {
       const neighbour = media[(i + media.length) % media.length];
       if (neighbour?.type === "image") {
-        new Image().src = largeUrl(neighbour.name);
+        new Image().src = neighbour.large;
       }
     });
   }, [index, media]);
@@ -83,10 +77,15 @@ export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
         <span>
           {String(index + 1).padStart(2, "0")} /{" "}
           {String(media.length).padStart(2, "0")}
+          {item.credit && (
+            <span className="ml-4 normal-case tracking-[0.15em] text-ivory">
+              <span className="text-champagne">Shared by</span> {item.credit}
+            </span>
+          )}
         </span>
         <div className="flex items-center gap-6">
           <a
-            href={`/api/photo/${encodeURIComponent(item.name)}?size=original`}
+            href={item.download}
             download
             className="text-ivory transition-colors hover:text-champagne"
           >
@@ -108,8 +107,8 @@ export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
         {item.type === "video" ? (
           // eslint-disable-next-line jsx-a11y/media-has-caption
           <video
-            key={item.name}
-            src={videoUrl(item.name)}
+            key={item.id}
+            src={item.src}
             controls
             autoPlay
             playsInline
@@ -119,8 +118,8 @@ export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
         ) : (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            key={item.name}
-            src={largeUrl(item.name)}
+            key={item.id}
+            src={item.large}
             alt={`Photograph ${index + 1}`}
             className="max-h-full max-w-full object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}

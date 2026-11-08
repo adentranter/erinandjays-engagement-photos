@@ -6,4 +6,7 @@ services:
     volumes:
       # Drop full-res photos here — that's the whole CMS.
       - ./photos:/photos:ro
+    env_file:
+      - path: .env
+        required: false
     restart: unless-stopped
