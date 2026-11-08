@@ -3,6 +3,15 @@
 import { useState } from "react";
 import type { GalleryItem } from "@/lib/gallery-types";
 import { Lightbox } from "@/components/lightbox";
+import { MotionVideo } from "@/components/motion-video";
+
+function Badge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="pointer-events-none absolute top-2.5 left-2.5 border border-ivory/40 bg-ink/55 px-2 py-0.5 text-[9px] uppercase tracking-[0.25em] text-ivory backdrop-blur-sm">
+      {children}
+    </span>
+  );
+}
 
 export function Gallery({ media }: { media: GalleryItem[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -22,19 +31,42 @@ export function Gallery({ media }: { media: GalleryItem[] }) {
                 : `View photograph ${i + 1} of ${media.length}`
             }
           >
-            {item.type === "video" ? (
+            {item.type === "animation" && item.motion ? (
               <span className="relative block w-full bg-ink-raised">
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <video
-                  src={`${item.src}#t=0.1`}
-                  muted
-                  playsInline
-                  preload="metadata"
+                <MotionVideo
+                  src={item.motion}
+                  poster={item.thumb}
                   className="h-auto w-full"
-                  style={{
-                    aspectRatio: `${item.width ?? 16} / ${item.height ?? 9}`,
-                  }}
+                  style={{ aspectRatio: `${item.width ?? 3} / ${item.height ?? 4}` }}
                 />
+                <Badge>Live</Badge>
+              </span>
+            ) : item.type === "video" ? (
+              <span className="relative block w-full bg-ink-raised">
+                {item.poster ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={item.thumb}
+                    alt=""
+                    width={item.width}
+                    height={item.height}
+                    loading={i < 8 ? "eager" : "lazy"}
+                    decoding="async"
+                    className="h-auto w-full"
+                  />
+                ) : (
+                  // eslint-disable-next-line jsx-a11y/media-has-caption
+                  <video
+                    src={`${item.src}#t=0.1`}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="h-auto w-full"
+                    style={{
+                      aspectRatio: `${item.width ?? 16} / ${item.height ?? 9}`,
+                    }}
+                  />
+                )}
                 <span
                   aria-hidden
                   className="pointer-events-none absolute inset-0 flex items-center justify-center"

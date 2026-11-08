@@ -4,7 +4,9 @@ export const dynamic = "force-dynamic";
 
 /**
  * UploadThing URLs are cross-origin, so <a download> is ignored there.
- * Proxy the original through us with an attachment disposition instead.
+ * Proxy the file through us with an attachment disposition instead.
+ * Default is the untouched original; ?asset=gif gives the animated GIF
+ * made from a Live/Motion Photo (or a short video).
  */
 export async function GET(
   req: Request,
@@ -14,15 +16,23 @@ export async function GET(
   const row = await getRow(id);
   if (!row || row.hidden) return new Response("Not found", { status: 404 });
 
-  const upstream = await fetch(row.url, { signal: req.signal });
+  const wantsGif = new URL(req.url).searchParams.get("asset") === "gif";
+  if (wantsGif && !row.gifUrl) return new Response("Not found", { status: 404 });
+  const url = wantsGif ? row.gifUrl! : row.url;
+  const fileName = wantsGif
+    ? `${row.fileName.replace(/\.[^.]+$/, "")}.gif`
+    : row.fileName;
+
+  const upstream = await fetch(url, { signal: req.signal });
   if (!upstream.ok || !upstream.body) {
     return new Response("Not found", { status: 404 });
   }
 
   const headers = new Headers({
-    "Content-Type":
-      upstream.headers.get("content-type") ?? "application/octet-stream",
-    "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(row.fileName)}`,
+    "Content-Type": wantsGif
+      ? "image/gif"
+      : upstream.headers.get("content-type") ?? "application/octet-stream",
+    "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
     "Cache-Control": "private, max-age=3600",
   });
   const length = upstream.headers.get("content-length");

@@ -6,7 +6,8 @@ export const ALBUMS: readonly Album[] = ["wedding", "engagement"];
 /** One tile in a gallery, wherever the file actually lives. */
 export interface GalleryItem {
   id: string;
-  type: "image" | "video";
+  /** animation = Live Photo, Motion Photo or animated GIF */
+  type: "image" | "animation" | "video";
   width?: number;
   height?: number;
   /** ~640px image for the grid */
@@ -15,6 +16,12 @@ export interface GalleryItem {
   large: string;
   /** Inline source (video playback) */
   src: string;
+  /** Still frame for videos */
+  poster?: string;
+  /** Silent looping MP4 for Live/Motion Photos */
+  motion?: string;
+  /** Same-origin attachment URL for the GIF version, when there is one */
+  gifDownload?: string;
   /** Same-origin URL that responds with an attachment */
   download: string;
   role: Role;

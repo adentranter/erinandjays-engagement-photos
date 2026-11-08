@@ -3,7 +3,7 @@ import { UploadThingError } from "uploadthing/server";
 import { z } from "zod";
 import { sessionFromRequest } from "@/lib/auth";
 import { insertMedia } from "@/lib/media";
-import { queueDerivatives } from "@/lib/derivatives";
+import { nudgeMediaWorker } from "@/lib/processing/worker";
 import type { Album, Role } from "@/lib/gallery-types";
 
 const f = createUploadthing();
@@ -25,10 +25,10 @@ async function record(
     fileKey: file.key,
     fileName: file.name,
     url: file.ufsUrl,
-    type: file.type.startsWith("video/") ? "video" : "image",
+    mimeType: file.type,
     size: file.size,
   });
-  queueDerivatives(id);
+  nudgeMediaWorker();
   return { id };
 }
 

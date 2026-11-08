@@ -24,27 +24,75 @@ enum Role {
 
 enum MediaType {
   image
+  /// Animated: Live Photo, Android Motion Photo or an uploaded GIF
+  animation
   video
 }
 
+enum ProcessingStatus {
+  pending
+  uploading
+  processing
+  ready
+  failed
+}
+
 model Media {
-  id           String    @id @default(uuid()) @db.Uuid
+  id           String           @id @default(uuid()) @db.Uuid
   album        Album
   role         Role
-  uploaderName String?   @map("uploader_name")
-  fileKey      String    @unique @map("file_key")
-  fileName     String    @map("file_name")
+  uploaderName String?          @map("uploader_name")
+  fileKey      String           @unique @map("file_key")
+  fileName     String           @map("file_name")
+  /// Original upload — never replaced or deleted by processing.
   url          String
+  mimeType     String?          @map("mime_type")
   type         MediaType
-  size         BigInt    @default(0)
+  size         BigInt           @default(0)
   width        Int?
   height       Int?
-  thumbUrl     String?   @map("thumb_url")
-  largeUrl     String?   @map("large_url")
-  derivedKeys  String[]  @default([]) @map("derived_keys")
-  hidden       Boolean   @default(false)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  durationMs   Int?             @map("duration_ms")
+  thumbUrl     String?          @map("thumb_url")
+  largeUrl     String?          @map("large_url")
+  /// Browser-friendly H.264 MP4: the motion clip for animations, or a
+  /// transcode for videos the browser can't play natively (e.g. HEVC).
+  videoUrl     String?          @map("video_url")
+  gifUrl       String?          @map("gif_url")
+  /// "live_photo" | "motion_photo" | "gif" when type = animation
+  motionSource String?          @map("motion_source")
+  derivedKeys  String[]         @default([]) @map("derived_keys")
+  hidden       Boolean          @default(false)
+  /// Extra clockwise rotation chosen in the studio (0/90/180/270), applied
+  /// on top of the file's own orientation metadata when processing.
+  rotation     Int              @default(0)
+
+  status       ProcessingStatus @default(pending)
+  attempts     Int              @default(0)
+  error        String?
+  runAfter     DateTime         @default(now()) @map("run_after") @db.Timestamptz(6)
+  lockedAt     DateTime?        @map("locked_at") @db.Timestamptz(6)
+  processedAt  DateTime?        @map("processed_at") @db.Timestamptz(6)
+
+  /// Apple ContentIdentifier shared by a Live Photo's still and its MOV.
+  contentId    String?          @map("content_id")
+  /// Set on a Live Photo's MOV once it has been merged into its still.
+  /// The row (and file) is kept, but it's not shown on its own.
+  companionOf  String?          @map("companion_of") @db.Uuid
+
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([album, createdAt])
+  @@index([status, runAfter])
+  @@index([companionOf])
   @@map("media")
+}
+
+/// Per-album choices made in the studio.
+model AlbumSettings {
+  album     Album    @id
+  /// Gallery item id: a media uuid, or "file:<name>" for built-in photos.
+  coverId   String?  @map("cover_id")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("album_settings")
 }

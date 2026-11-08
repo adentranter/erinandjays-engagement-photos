@@ -8,8 +8,11 @@ import {
   isPhotographer,
   startSession,
 } from "@/lib/auth";
-import { deleteRow, setHidden } from "@/lib/media";
-import { utapi } from "@/lib/derivatives";
+import { deleteRow, setHidden, setRotation } from "@/lib/media";
+import { setCoverId } from "@/lib/albums";
+import { ALBUMS, type Album } from "@/lib/gallery-types";
+import { utapi } from "@/lib/processing/storage";
+import { requeue } from "@/lib/processing/worker";
 
 export async function login(
   _prev: { error: string | null },
@@ -55,5 +58,29 @@ export async function removeMedia(form: FormData) {
       console.error("[delete] uploadthing cleanup failed:", err);
     }
   }
+  refresh();
+}
+
+export async function retryMedia(form: FormData) {
+  await requirePhotographer();
+  await requeue(String(form.get("id")));
+  refresh();
+}
+
+/** Turn a photo or video a further 90° clockwise and reprocess it. */
+export async function rotateMedia(form: FormData) {
+  await requirePhotographer();
+  const id = String(form.get("id"));
+  await setRotation(id, 90);
+  await requeue(id);
+  refresh();
+}
+
+export async function chooseCover(form: FormData) {
+  await requirePhotographer();
+  const album = String(form.get("album"));
+  if (!(ALBUMS as readonly string[]).includes(album)) return;
+  const coverId = String(form.get("coverId") ?? "").trim();
+  await setCoverId(album as Album, coverId || null);
   refresh();
 }

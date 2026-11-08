@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import type { GalleryItem } from "@/lib/gallery-types";
+import { MotionVideo } from "@/components/motion-video";
 
 interface LightboxProps {
   media: GalleryItem[];
@@ -43,7 +44,7 @@ export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
   useEffect(() => {
     [index - 1, index + 1].forEach((i) => {
       const neighbour = media[(i + media.length) % media.length];
-      if (neighbour?.type === "image") {
+      if (neighbour && neighbour.type !== "video") {
         new Image().src = neighbour.large;
       }
     });
@@ -84,6 +85,15 @@ export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
           )}
         </span>
         <div className="flex items-center gap-6">
+          {item.gifDownload && (
+            <a
+              href={item.gifDownload}
+              download
+              className="text-ivory transition-colors hover:text-champagne"
+            >
+              GIF
+            </a>
+          )}
           <a
             href={item.download}
             download
@@ -104,11 +114,22 @@ export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
 
       {/* Media */}
       <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-4 sm:px-16">
-        {item.type === "video" ? (
+        {item.type === "animation" && item.motion ? (
+          <div onClick={(e) => e.stopPropagation()} className="contents">
+            <MotionVideo
+              key={item.id}
+              src={item.motion}
+              poster={item.large}
+              alwaysPlay
+              className="max-h-full max-w-full object-contain shadow-2xl"
+            />
+          </div>
+        ) : item.type === "video" ? (
           // eslint-disable-next-line jsx-a11y/media-has-caption
           <video
             key={item.id}
             src={item.src}
+            poster={item.poster}
             controls
             autoPlay
             playsInline

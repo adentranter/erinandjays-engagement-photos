@@ -1,15 +1,9 @@
 import Link from "next/link";
 import { getAlbum } from "@/lib/media";
+import { getCoverIds, pickCover } from "@/lib/albums";
 import type { GalleryItem } from "@/lib/gallery-types";
 
 export const dynamic = "force-dynamic";
-
-function cover(items: GalleryItem[]): GalleryItem | undefined {
-  return (
-    items.find((m) => m.type === "image" && m.role === "photographer") ??
-    items.find((m) => m.type === "image")
-  );
-}
 
 function AlbumCard({
   href,
@@ -55,9 +49,10 @@ function AlbumCard({
 }
 
 export default async function Home() {
-  const [wedding, engagement] = await Promise.all([
+  const [wedding, engagement, covers] = await Promise.all([
     getAlbum("wedding"),
     getAlbum("engagement"),
+    getCoverIds(),
   ]);
 
   return (
@@ -77,14 +72,14 @@ export default async function Home() {
           href="/wedding"
           title="Wedding"
           subtitle="The day itself"
-          item={cover(wedding)}
+          item={pickCover(wedding, covers.wedding)}
           count={wedding.length}
         />
         <AlbumCard
           href="/engagement"
           title="Engagement"
           subtitle="28 June 2026"
-          item={cover(engagement)}
+          item={pickCover(engagement, covers.engagement)}
           count={engagement.length}
         />
       </div>

@@ -13,40 +13,58 @@ export interface NewMedia {
   fileKey: string;
   fileName: string;
   url: string;
-  type: "image" | "video";
+  /** What the browser said; the worker re-checks the actual bytes. */
+  mimeType: string;
   size: number;
 }
 
+/** Record a finished upload and queue it for processing. */
 export async function insertMedia(m: NewMedia): Promise<string> {
+  const type = m.mimeType.startsWith("video/") ? "video" : "image";
   const row = await db.media.upsert({
     where: { fileKey: m.fileKey },
-    create: { ...m, size: BigInt(m.size) },
+    create: { ...m, type, size: BigInt(m.size), status: "pending" },
     update: { url: m.url },
     select: { id: true },
   });
   return row.id;
 }
 
-export async function setDerivatives(
-  id: string,
-  d: {
-    width: number;
-    height: number;
-    thumbUrl: string | null;
-    largeUrl: string | null;
-    keys: string[];
-  }
-): Promise<void> {
-  await db.media.update({
-    where: { id },
-    data: {
-      width: d.width,
-      height: d.height,
-      thumbUrl: d.thumbUrl,
-      largeUrl: d.largeUrl,
-      derivedKeys: d.keys,
+export interface MediaStatus {
+  id: string;
+  status: MediaRow["status"];
+  type: MediaRow["type"];
+  thumb: string | null;
+  motionSource: string | null;
+  /** Merged into this Live Photo still */
+  partOf: string | null;
+  error: string | null;
+}
+
+export async function getStatuses(ids: string[]): Promise<MediaStatus[]> {
+  const valid = ids.filter(isUuid).slice(0, 100);
+  if (!valid.length) return [];
+  const rows = await db.media.findMany({
+    where: { id: { in: valid } },
+    select: {
+      id: true,
+      status: true,
+      type: true,
+      thumbUrl: true,
+      motionSource: true,
+      companionOf: true,
+      error: true,
     },
   });
+  return rows.map((r) => ({
+    id: r.id,
+    status: r.status,
+    type: r.type,
+    thumb: r.thumbUrl,
+    motionSource: r.motionSource,
+    partOf: r.companionOf,
+    error: r.status === "failed" ? r.error : null,
+  }));
 }
 
 export async function getRow(id: string): Promise<MediaRow | null> {
@@ -60,16 +78,31 @@ export async function listRows(
 ): Promise<MediaRow[]> {
   if (!hasDatabase()) return [];
   if (opts.includeHidden) {
+    // Studio view: everything except Live Photo MOVs merged into a still.
     return db.media.findMany({
-      where: { album },
+      where: { album, companionOf: null },
       orderBy: { createdAt: "desc" },
     });
   }
+  // Public: processed items only. Rows being reprocessed stay visible as
+  // long as they already have renditions from an earlier pass.
   // Photographer's set first, then guests in the order they arrived.
   return db.media.findMany({
-    where: { album, hidden: false },
+    where: {
+      album,
+      hidden: false,
+      companionOf: null,
+      OR: [{ status: "ready" }, { status: { not: "failed" }, thumbUrl: { not: null } }],
+    },
     orderBy: [{ role: "asc" }, { createdAt: "asc" }],
   });
+}
+
+/** Add `by` degrees (clockwise) to the studio rotation. */
+export async function setRotation(id: string, by: number): Promise<void> {
+  if (!isUuid(id)) return;
+  await db.$executeRaw`
+    UPDATE "media" SET "rotation" = ("rotation" + ${by}::int) % 360 WHERE "id" = ${id}::uuid`;
 }
 
 export async function setHidden(id: string, hidden: boolean): Promise<void> {
@@ -77,13 +110,19 @@ export async function setHidden(id: string, hidden: boolean): Promise<void> {
   await db.media.updateMany({ where: { id }, data: { hidden } });
 }
 
-/** Removes the row and returns every UploadThing key that belonged to it. */
+/**
+ * Removes the row (and a Live Photo's merged MOV) and returns every
+ * UploadThing key that belonged to them.
+ */
 export async function deleteRow(id: string): Promise<string[]> {
   if (!isUuid(id)) return [];
-  const row = await db.media
-    .delete({ where: { id }, select: { fileKey: true, derivedKeys: true } })
-    .catch(() => null); // already gone
-  return row ? [row.fileKey, ...row.derivedKeys] : [];
+  const rows = await db.media.findMany({
+    where: { OR: [{ id }, { companionOf: id }] },
+    select: { id: true, fileKey: true, derivedKeys: true },
+  });
+  if (!rows.length) return [];
+  await db.media.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
+  return rows.flatMap((r) => [r.fileKey, ...r.derivedKeys]);
 }
 
 function isUuid(id: string): boolean {
@@ -95,6 +134,7 @@ function isUuid(id: string): boolean {
 /* ---------- mapping to what the gallery renders ---------- */
 
 export function rowToItem(row: MediaRow): GalleryItem {
+  const download = `/api/media/${row.id}/download`;
   return {
     id: row.id,
     type: row.type,
@@ -102,8 +142,12 @@ export function rowToItem(row: MediaRow): GalleryItem {
     height: row.height ?? undefined,
     thumb: row.thumbUrl ?? row.url,
     large: row.largeUrl ?? row.url,
-    src: row.url,
-    download: `/api/media/${row.id}/download`,
+    // Prefer the browser-friendly MP4 (motion clip or HEVC transcode).
+    src: row.videoUrl ?? row.url,
+    poster: row.type === "video" ? row.largeUrl ?? undefined : undefined,
+    motion: row.type === "animation" && row.motionSource !== "gif" ? row.videoUrl ?? undefined : undefined,
+    gifDownload: row.gifUrl ? `${download}?asset=gif` : undefined,
+    download,
     role: row.role,
     credit: row.role === "guest" ? row.uploaderName ?? "A guest" : null,
   };

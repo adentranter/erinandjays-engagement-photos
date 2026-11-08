@@ -25,9 +25,9 @@ function parseAlbum(raw: string | null): Album {
     : "engagement";
 }
 
-function matchesKind(type: "image" | "video", kind: Kind): boolean {
+function matchesKind(type: "image" | "animation" | "video", kind: Kind): boolean {
   if (kind === "all") return true;
-  if (kind === "photos") return type === "image";
+  if (kind === "photos") return type !== "video";
   return type === "video";
 }
 
