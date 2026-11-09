@@ -440,8 +440,10 @@ async function finish(row: Media, result: Result | null): Promise<void> {
   };
   const newKeys = stored.map((s) => s.key);
 
-  await db.media.update({
-    where: { id: row.id },
+  // If someone pressed Rotate while this ran, the row now wants a different
+  // result and has been re-queued: don't overwrite it, discard this output.
+  const { count } = await db.media.updateMany({
+    where: { id: row.id, rotation: row.rotation, status: "processing" },
     data: {
       type: result.type,
       mimeType: result.mimeType,
@@ -461,6 +463,10 @@ async function finish(row: Media, result: Result | null): Promise<void> {
       processedAt: new Date(),
     },
   });
+  if (count === 0) {
+    await utapi.deleteFiles(newKeys).catch(() => {});
+    return;
+  }
 
   const stale = row.derivedKeys.filter((k) => !newKeys.includes(k));
   if (stale.length) {

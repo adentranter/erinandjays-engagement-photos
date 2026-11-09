@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getAlbum } from "@/lib/media";
+import { currentOwnerHash } from "@/lib/guest";
 import { DownloadMenu } from "@/components/download-menu";
 import { SiteNav } from "@/components/site-nav";
 import { AlbumHeader, mediaLabel } from "@/components/album-header";
@@ -10,8 +11,8 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Ehrin & Jay — Wedding" };
 
 export default async function WeddingPage() {
-  const media = await getAlbum("wedding");
-  const photos = media.filter((m) => m.type === "image").length;
+  const media = await getAlbum("wedding", await currentOwnerHash());
+  const photos = media.filter((m) => m.type !== "video").length;
   const videos = media.length - photos;
   const details = process.env.WEDDING_DETAILS; // e.g. "14 March 2027 · Somewhere lovely"
 

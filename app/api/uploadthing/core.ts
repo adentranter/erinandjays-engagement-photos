@@ -3,6 +3,7 @@ import { UploadThingError } from "uploadthing/server";
 import { z } from "zod";
 import { sessionFromRequest } from "@/lib/auth";
 import { insertMedia } from "@/lib/media";
+import { ownerHashFromRequest } from "@/lib/guest";
 import { nudgeMediaWorker } from "@/lib/processing/worker";
 import type { Album, Role } from "@/lib/gallery-types";
 
@@ -12,6 +13,7 @@ interface Meta {
   album: Album;
   role: Role;
   uploaderName: string | null;
+  ownerTokenHash: string | null;
 }
 
 async function record(
@@ -22,6 +24,7 @@ async function record(
     album: metadata.album,
     role: metadata.role,
     uploaderName: metadata.uploaderName,
+    ownerTokenHash: metadata.ownerTokenHash,
     fileKey: file.key,
     fileName: file.name,
     url: file.ufsUrl,
@@ -44,7 +47,7 @@ export const uploadRouter = {
         code: z.string().trim().max(100).optional(),
       })
     )
-    .middleware(async ({ input }) => {
+    .middleware(async ({ req, input }) => {
       const required = process.env.GUEST_UPLOAD_CODE?.trim();
       if (required && input.code?.toLowerCase() !== required.toLowerCase()) {
         throw new UploadThingError("That guest code doesn't match.");
@@ -53,6 +56,8 @@ export const uploadRouter = {
         album: "wedding",
         role: "guest",
         uploaderName: input.name,
+        // Lets this browser rotate/delete its own uploads later.
+        ownerTokenHash: ownerHashFromRequest(req),
       } satisfies Meta;
     })
     .onUploadComplete(({ metadata, file }) => record(metadata, file)),
@@ -71,6 +76,7 @@ export const uploadRouter = {
         album: input.album,
         role: "photographer",
         uploaderName: null,
+        ownerTokenHash: null,
       } satisfies Meta;
     })
     .onUploadComplete(({ metadata, file }) => record(metadata, file)),

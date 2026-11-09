@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { GalleryItem } from "@/lib/gallery-types";
 import { MotionVideo } from "@/components/motion-video";
+import { MyUploadActions } from "@/components/my-upload-actions";
 
 interface LightboxProps {
   media: GalleryItem[];
@@ -72,7 +73,7 @@ export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
     >
       {/* Top bar */}
       <div
-        className="flex items-center justify-between px-5 py-4 text-[11px] uppercase tracking-[0.3em] text-ivory-dim"
+        className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-4 text-[11px] uppercase tracking-[0.3em] text-ivory-dim"
         onClick={(e) => e.stopPropagation()}
       >
         <span>
@@ -84,7 +85,10 @@ export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
             </span>
           )}
         </span>
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 sm:gap-x-6">
+          {item.mine && (
+            <MyUploadActions id={item.id} onDeleted={onClose} className="text-ivory" />
+          )}
           {item.gifDownload && (
             <a
               href={item.gifDownload}

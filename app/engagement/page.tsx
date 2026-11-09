@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Ehrin & Jay — Engagement" };
 
 export default async function EngagementPage() {
   const media = await getAlbum("engagement");
-  const photos = media.filter((m) => m.type === "image").length;
+  const photos = media.filter((m) => m.type !== "video").length;
   const videos = media.length - photos;
 
   return (

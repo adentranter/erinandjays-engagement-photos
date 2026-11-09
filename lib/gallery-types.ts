@@ -27,4 +27,6 @@ export interface GalleryItem {
   role: Role;
   /** Guest name to show, or null for the photographer */
   credit: string | null;
+  /** Uploaded from this browser: the viewer may rotate or delete it */
+  mine?: boolean;
 }

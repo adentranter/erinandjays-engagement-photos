@@ -10,6 +10,7 @@ export interface NewMedia {
   album: Album;
   role: Role;
   uploaderName: string | null;
+  ownerTokenHash: string | null;
   fileKey: string;
   fileName: string;
   url: string;
@@ -131,9 +132,26 @@ function isUuid(id: string): boolean {
   );
 }
 
+/** A guest's own uploads (this browser), newest first. */
+export async function listOwned(ownerHash: string | null): Promise<MediaRow[]> {
+  if (!ownerHash || !hasDatabase()) return [];
+  return db.media.findMany({
+    where: { ownerTokenHash: ownerHash, role: "guest", companionOf: null },
+    orderBy: { createdAt: "desc" },
+    take: 500,
+  });
+}
+
+/** The row, only if it belongs to this guest browser. */
+export async function getOwnedRow(id: string, ownerHash: string | null): Promise<MediaRow | null> {
+  if (!ownerHash) return null;
+  const row = await getRow(id);
+  return row && row.role === "guest" && row.ownerTokenHash === ownerHash ? row : null;
+}
+
 /* ---------- mapping to what the gallery renders ---------- */
 
-export function rowToItem(row: MediaRow): GalleryItem {
+export function rowToItem(row: MediaRow, ownerHash?: string | null): GalleryItem {
   const download = `/api/media/${row.id}/download`;
   return {
     id: row.id,
@@ -150,6 +168,7 @@ export function rowToItem(row: MediaRow): GalleryItem {
     download,
     role: row.role,
     credit: row.role === "guest" ? row.uploaderName ?? "A guest" : null,
+    mine: Boolean(ownerHash && row.ownerTokenHash === ownerHash) || undefined,
   };
 }
 
@@ -173,8 +192,11 @@ function fileToItem(m: MediaItem): GalleryItem {
  * Everything visible in an album. The engagement album also includes the
  * files baked into ./photos, which stay the source of truth for that shoot.
  */
-export async function getAlbum(album: Album): Promise<GalleryItem[]> {
-  const rows = (await listRows(album)).map(rowToItem);
+export async function getAlbum(
+  album: Album,
+  ownerHash?: string | null
+): Promise<GalleryItem[]> {
+  const rows = (await listRows(album)).map((r) => rowToItem(r, ownerHash));
   if (album !== "engagement") return rows;
   const files = (await getMedia()).map(fileToItem);
   return [...files, ...rows];
