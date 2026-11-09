@@ -17,6 +17,7 @@ export interface NewMedia {
   /** What the browser said; the worker re-checks the actual bytes. */
   mimeType: string;
   size: number;
+  fingerprint: string | null;
 }
 
 /** Record a finished upload and queue it for processing. */
@@ -130,6 +131,62 @@ function isUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     id
   );
+}
+
+export interface FileProbe {
+  key: string;
+  name: string;
+  size: number;
+  fingerprint?: string | null;
+}
+
+export interface DuplicateMatch {
+  /** "file": same contents; "name": same filename and size */
+  reason: "file" | "name";
+  /** Uploaded from this browser */
+  mine: boolean;
+}
+
+/**
+ * Which of these files are already in the album? A file matches an
+ * existing upload with the same fingerprint, or the same name and size
+ * (older uploads have no fingerprint). Failed uploads don't count, so
+ * they can be sent again.
+ */
+export async function findDuplicates(
+  album: Album,
+  files: FileProbe[],
+  ownerHash: string | null
+): Promise<Record<string, DuplicateMatch>> {
+  if (!files.length || !hasDatabase()) return {};
+  const fingerprints = files.map((f) => f.fingerprint).filter((f): f is string => !!f);
+  const names = files.map((f) => f.name);
+  const rows = await db.media.findMany({
+    where: {
+      album,
+      status: { not: "failed" },
+      OR: [
+        ...(fingerprints.length ? [{ fingerprint: { in: fingerprints } }] : []),
+        { fileName: { in: names, mode: "insensitive" as const } },
+      ],
+    },
+    select: { fingerprint: true, fileName: true, size: true, ownerTokenHash: true },
+  });
+  const out: Record<string, DuplicateMatch> = {};
+  for (const f of files) {
+    const byFile = f.fingerprint ? rows.find((r) => r.fingerprint === f.fingerprint) : undefined;
+    const byName = rows.find(
+      (r) => r.fileName.toLowerCase() === f.name.toLowerCase() && Number(r.size) === f.size
+    );
+    const hit = byFile ?? byName;
+    if (hit) {
+      out[f.key] = {
+        reason: byFile ? "file" : "name",
+        mine: Boolean(ownerHash && hit.ownerTokenHash === ownerHash),
+      };
+    }
+  }
+  return out;
 }
 
 /** A guest's own uploads (this browser), newest first. */

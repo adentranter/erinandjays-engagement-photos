@@ -49,6 +49,9 @@ model Media {
   /// Original upload — never replaced or deleted by processing.
   url            String
   mimeType       String?   @map("mime_type")
+  /// Content fingerprint from the uploader (size + sampled SHA-256), used to
+  /// spot the same photo being uploaded twice, even under another name.
+  fingerprint    String?
   type           MediaType
   size           BigInt    @default(0)
   width          Int?
@@ -87,6 +90,7 @@ model Media {
   @@index([status, runAfter])
   @@index([companionOf])
   @@index([ownerTokenHash])
+  @@index([album, fingerprint])
   @@map("media")
 }
 
