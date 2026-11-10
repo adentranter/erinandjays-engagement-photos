@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import type { GalleryItem } from "@/lib/gallery-types";
+import { useCallback, useEffect, useState } from "react";
+import { PHOTO_PARAM, type GalleryItem } from "@/lib/gallery-types";
 import { Lightbox } from "@/components/lightbox";
 import { MotionVideo } from "@/components/motion-video";
 
@@ -16,6 +16,39 @@ function Badge({ children }: { children: React.ReactNode }) {
 export function Gallery({ media }: { media: GalleryItem[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
+  // Each open photo has its own URL (?photo=<id>): opening one pushes a
+  // history entry so Back closes it, arrowing replaces it, and a pasted
+  // link opens straight into that photo.
+  const indexFromUrl = useCallback(() => {
+    const id = new URLSearchParams(window.location.search).get(PHOTO_PARAM);
+    const i = id ? media.findIndex((m) => m.id === id) : -1;
+    return i >= 0 ? i : null;
+  }, [media]);
+
+  useEffect(() => {
+    setOpenIndex(indexFromUrl());
+    const onPop = () => setOpenIndex(indexFromUrl());
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [indexFromUrl]);
+
+  const open = (i: number) => {
+    setOpenIndex(i);
+    window.history.pushState({ lightbox: true }, "", photoUrl(media[i].id));
+  };
+  const navigate = useCallback(
+    (i: number) => {
+      setOpenIndex(i);
+      window.history.replaceState(window.history.state, "", photoUrl(media[i].id));
+    },
+    [media]
+  );
+  const close = useCallback(() => {
+    setOpenIndex(null);
+    if (window.history.state?.lightbox) window.history.back();
+    else window.history.replaceState(window.history.state, "", photoUrl(null));
+  }, []);
+
   return (
     <>
       <div className="columns-1 gap-3 sm:columns-2 lg:columns-3 xl:columns-4">
@@ -23,7 +56,7 @@ export function Gallery({ media }: { media: GalleryItem[] }) {
           <button
             key={item.id}
             type="button"
-            onClick={() => setOpenIndex(i)}
+            onClick={() => open(i)}
             className="tile mb-3 block w-full cursor-zoom-in break-inside-avoid focus:outline-none"
             aria-label={
               item.type === "video"
@@ -109,10 +142,18 @@ export function Gallery({ media }: { media: GalleryItem[] }) {
         <Lightbox
           media={media}
           index={openIndex}
-          onNavigate={setOpenIndex}
-          onClose={() => setOpenIndex(null)}
+          onNavigate={navigate}
+          onClose={close}
         />
       )}
     </>
   );
+}
+
+/** The current page's URL with ?photo= set to `id` (or removed). */
+export function photoUrl(id: string | null): string {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set(PHOTO_PARAM, id);
+  else url.searchParams.delete(PHOTO_PARAM);
+  return url.pathname + url.search + url.hash;
 }

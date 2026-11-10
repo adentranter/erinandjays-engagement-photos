@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 import { getAlbum } from "@/lib/media";
+import { albumMetadata, PHOTO_PARAM } from "@/lib/share";
 import { Gallery } from "@/components/gallery";
 import { DownloadMenu } from "@/components/download-menu";
 import { SiteNav } from "@/components/site-nav";
 import { AlbumHeader, Dot, mediaLabel } from "@/components/album-header";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Ehrin & Jay — Engagement" };
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  return albumMetadata("engagement", "Ehrin & Jay — Engagement", (await searchParams)[PHOTO_PARAM]);
+}
 
 export default async function EngagementPage() {
   const media = await getAlbum("engagement");

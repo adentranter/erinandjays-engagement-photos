@@ -27,6 +27,22 @@
         "tools/dof-studio/app.py"
       ],
       "port": 7861
+    },
+    {
+      "name": "dev-nodb",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "-u",
+        "NODE_ENV",
+        "DATABASE_URL=",
+        "DIRECT_URL=",
+        "npx",
+        "next",
+        "dev",
+        "-p",
+        "3124"
+      ],
+      "port": 3124
     }
   ]
 }

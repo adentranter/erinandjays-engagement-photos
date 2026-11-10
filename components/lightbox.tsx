@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { GalleryItem } from "@/lib/gallery-types";
 import { MotionVideo } from "@/components/motion-video";
 import { MyUploadActions } from "@/components/my-upload-actions";
@@ -89,6 +89,7 @@ export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
           {item.mine && (
             <MyUploadActions id={item.id} onDeleted={onClose} className="text-ivory" />
           )}
+          <CopyLink key={item.id} />
           {item.gifDownload && (
             <a
               href={item.gifDownload}
@@ -182,4 +183,65 @@ function NavButton({
       {side === "left" ? "\u2190" : "\u2192"}
     </button>
   );
+}
+
+/**
+ * Copies the current address (which already points at this photo). Falls
+ * back to the system share sheet where the clipboard isn't available.
+ */
+function CopyLink() {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+
+  useEffect(() => {
+    if (state === "idle") return;
+    const t = setTimeout(() => setState("idle"), 2000);
+    return () => clearTimeout(t);
+  }, [state]);
+
+  const copy = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.clipboard) await navigator.clipboard.writeText(url);
+      else if (!legacyCopy(url)) throw new Error("no clipboard");
+      setState("copied");
+    } catch {
+      if (legacyCopy(url)) return setState("copied");
+      try {
+        if (!navigator.share) throw new Error("no share");
+        await navigator.share({ url, title: document.title });
+      } catch (err) {
+        if ((err as Error)?.name !== "AbortError") setState("failed");
+      }
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      aria-live="polite"
+      className="text-ivory transition-colors hover:text-champagne"
+    >
+      {state === "copied" ? "Link copied" : state === "failed" ? "Couldn\u2019t copy" : "Copy link"}
+    </button>
+  );
+}
+
+/** Older copy path for browsers/webviews that refuse the async clipboard. */
+function legacyCopy(text: string): boolean {
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.setAttribute("readonly", "");
+  field.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
+  document.body.appendChild(field);
+  field.select();
+  field.setSelectionRange(0, text.length);
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  field.remove();
+  return ok;
 }

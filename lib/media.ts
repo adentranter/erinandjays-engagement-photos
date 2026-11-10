@@ -258,3 +258,22 @@ export async function getAlbum(
   const files = (await getMedia()).map(fileToItem);
   return [...files, ...rows];
 }
+
+/**
+ * One publicly visible item, for a shared `?photo=` link. Returns null for
+ * anything the album page wouldn't show (hidden, still processing, merged
+ * into a Live Photo, or from another album).
+ */
+export async function getPublicItem(album: Album, id: string): Promise<GalleryItem | null> {
+  if (id.startsWith("file:")) {
+    if (album !== "engagement") return null;
+    const name = id.slice("file:".length);
+    const file = (await getMedia()).find((m) => m.name === name);
+    return file ? fileToItem(file) : null;
+  }
+  if (!hasDatabase()) return null;
+  const row = await getRow(id);
+  if (!row || row.album !== album || row.hidden || row.companionOf) return null;
+  if (row.status !== "ready" && !(row.status !== "failed" && row.thumbUrl)) return null;
+  return rowToItem(row);
+}

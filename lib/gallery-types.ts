@@ -30,3 +30,6 @@ export interface GalleryItem {
   /** Uploaded from this browser: the viewer may rotate or delete it */
   mine?: boolean;
 }
+
+/** Query parameter that opens one item in an album's lightbox (?photo=<id>). */
+export const PHOTO_PARAM = "photo";

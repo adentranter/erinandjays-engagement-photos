@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getAlbum } from "@/lib/media";
+import { albumMetadata, PHOTO_PARAM } from "@/lib/share";
 import { currentOwnerHash } from "@/lib/guest";
 import { DownloadMenu } from "@/components/download-menu";
 import { SiteNav } from "@/components/site-nav";
@@ -8,7 +9,11 @@ import { AlbumHeader, mediaLabel } from "@/components/album-header";
 import { WeddingGallery } from "@/components/wedding-gallery";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Ehrin & Jay — Wedding" };
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  return albumMetadata("wedding", "Ehrin & Jay — Wedding", (await searchParams)[PHOTO_PARAM]);
+}
 
 export default async function WeddingPage() {
   const media = await getAlbum("wedding", await currentOwnerHash());
