@@ -5,6 +5,7 @@ import { sessionFromRequest } from "@/lib/auth";
 import { findDuplicates, insertMedia } from "@/lib/media";
 import { ownerHashFromRequest } from "@/lib/guest";
 import { nudgeMediaWorker } from "@/lib/processing/worker";
+import { addGuestSubscriber } from "@/lib/notify";
 import type { Album, Role } from "@/lib/gallery-types";
 
 const f = createUploadthing();
@@ -81,6 +82,8 @@ export const uploadRouter = {
       z.object({
         name: z.string().trim().min(1, "Add your name").max(60),
         code: z.string().trim().max(100).optional(),
+        /** Optional: email me when new photos are added */
+        email: z.union([z.literal(""), z.email().max(254)]).optional(),
         ...fileOptions,
       })
     )
@@ -90,12 +93,19 @@ export const uploadRouter = {
         throw new UploadThingError("That guest code doesn't match.");
       }
       await refuseDuplicates("wedding", files, input);
+      const ownerTokenHash = ownerHashFromRequest(req);
+      if (input.email) {
+        // Never let a mailing-list hiccup stop the upload itself.
+        await addGuestSubscriber({ email: input.email, name: input.name, ownerTokenHash }).catch((err) =>
+          console.error("[notify] couldn't save guest email:", err)
+        );
+      }
       return {
         album: "wedding",
         role: "guest",
         uploaderName: input.name,
         // Lets this browser rotate/delete its own uploads later.
-        ownerTokenHash: ownerHashFromRequest(req),
+        ownerTokenHash,
         fingerprint: files.length === 1 ? input.fingerprint ?? null : null,
       } satisfies Meta;
     })

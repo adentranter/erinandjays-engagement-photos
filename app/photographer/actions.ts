@@ -13,6 +13,13 @@ import { setCoverId } from "@/lib/albums";
 import { ALBUMS, type Album } from "@/lib/gallery-types";
 import { utapi } from "@/lib/processing/storage";
 import { requeue } from "@/lib/processing/worker";
+import {
+  normaliseEmail,
+  removeSubscriber,
+  saveSettings,
+  sendTestEmail,
+  setCoupleEmails,
+} from "@/lib/notify";
 
 export async function login(
   _prev: { error: string | null },
@@ -83,4 +90,37 @@ export async function chooseCover(form: FormData) {
   const coverId = String(form.get("coverId") ?? "").trim();
   await setCoverId(album as Album, coverId || null);
   refresh();
+}
+
+/* ---------- email updates ---------- */
+
+export async function saveEmailSettings(form: FormData) {
+  await requirePhotographer();
+  const emails = String(form.get("coupleEmails") ?? "")
+    .split(/[\s,;]+/)
+    .filter(Boolean)
+    .map(normaliseEmail)
+    .filter((e): e is string => Boolean(e));
+  const quiet = Number(form.get("quietMinutes"));
+  await setCoupleEmails(emails);
+  await saveSettings({
+    enabled: form.get("enabled") === "on",
+    emailGuests: form.get("emailGuests") === "on",
+    quietMinutes: [5, 10, 20, 30, 60].includes(quiet) ? quiet : 10,
+  });
+  revalidatePath("/photographer");
+  revalidatePath("/upload");
+}
+
+export async function removeSubscriberAction(form: FormData) {
+  await requirePhotographer();
+  await removeSubscriber(String(form.get("id")));
+  revalidatePath("/photographer");
+}
+
+export async function sendTestEmailAction(
+  _prev: { ok: boolean; message: string } | null
+): Promise<{ ok: boolean; message: string }> {
+  await requirePhotographer();
+  return sendTestEmail();
 }

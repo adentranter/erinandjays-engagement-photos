@@ -4,6 +4,7 @@ import { Uploader } from "@/components/uploader";
 import { MyUploadActions } from "@/components/my-upload-actions";
 import { currentOwnerHash } from "@/lib/guest";
 import { listOwned } from "@/lib/media";
+import { emailConfig, getSettings } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Ehrin & Jay — Share your photos" };
@@ -11,6 +12,8 @@ export const metadata: Metadata = { title: "Ehrin & Jay — Share your photos" }
 export default async function UploadPage() {
   const requireCode = Boolean(process.env.GUEST_UPLOAD_CODE?.trim());
   const mine = await listOwned(await currentOwnerHash()).catch(() => []);
+  const settings = await getSettings().catch(() => null);
+  const offerEmail = Boolean(settings?.enabled && settings.emailGuests && !emailConfig().missing.length);
 
   return (
     <main className="mx-auto max-w-xl px-4 pb-24 sm:px-8">
@@ -28,7 +31,7 @@ export default async function UploadPage() {
           wedding gallery with your name on them.
         </p>
       </header>
-      <Uploader mode="guest" requireCode={requireCode} />
+      <Uploader mode="guest" requireCode={requireCode} offerEmail={offerEmail} />
 
       {mine.length > 0 && (
         <section className="mt-20">

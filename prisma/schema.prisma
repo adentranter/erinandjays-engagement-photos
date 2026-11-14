@@ -103,3 +103,42 @@ model AlbumSettings {
 
   @@map("album_settings")
 }
+
+enum SubscriberKind {
+  /// Added in the studio (the bride and groom)
+  couple
+  /// Left their email when uploading
+  guest
+}
+
+/// People emailed when a batch of new uploads lands in a gallery.
+model Subscriber {
+  id               String         @id @default(uuid()) @db.Uuid
+  email            String         @unique
+  name             String?
+  kind             SubscriberKind
+  /// Guest cookie hash, so a guest isn't emailed about only their own uploads.
+  ownerTokenHash   String?        @map("owner_token_hash")
+  /// Secret for the one-click unsubscribe link in every email.
+  unsubscribeToken String         @unique @map("unsubscribe_token")
+  unsubscribedAt   DateTime?      @map("unsubscribed_at") @db.Timestamptz(6)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("subscribers")
+}
+
+/// Single row (id = 1): email update switches and the send cursor.
+model NotificationSettings {
+  id           Int       @id @default(1)
+  enabled      Boolean   @default(false)
+  /// Also email guests who left their address (couple always get it).
+  emailGuests  Boolean   @default(true) @map("email_guests")
+  /// A batch is "done" once nothing new has arrived for this long.
+  quietMinutes Int       @default(10) @map("quiet_minutes")
+  /// Uploads created after this have not been announced yet.
+  cursor       DateTime  @default(now()) @db.Timestamptz(6)
+  lastSentAt   DateTime? @map("last_sent_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("notification_settings")
+}

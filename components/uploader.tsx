@@ -51,7 +51,7 @@ interface Item {
 }
 
 type Props =
-  | { mode: "guest"; requireCode: boolean }
+  | { mode: "guest"; requireCode: boolean; offerEmail?: boolean }
   | { mode: "photographer"; album: "wedding" | "engagement" };
 
 /* ------------------------------------------------------------------ */
@@ -60,6 +60,7 @@ type Props =
 
 const NAME_KEY = "guest-upload-name";
 const CODE_KEY = "guest-upload-code";
+const EMAIL_KEY = "guest-upload-email";
 const PARALLEL_UPLOADS = 3;
 
 function load(key: string): string {
@@ -115,6 +116,7 @@ export function Uploader(props: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [email, setEmail] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [dragging, setDragging] = useState(false);
   const [running, setRunning] = useState(false);
@@ -131,6 +133,7 @@ export function Uploader(props: Props) {
   useEffect(() => {
     setName(load(NAME_KEY));
     setCode(load(CODE_KEY));
+    setEmail(load(EMAIL_KEY));
   }, []);
 
   // Free preview object URLs when the component goes away.
@@ -273,6 +276,7 @@ export function Uploader(props: Props) {
               input: {
                 name: name.trim(),
                 code: props.requireCode ? code.trim() : undefined,
+                email: props.offerEmail && email.trim() ? email.trim() : undefined,
                 ...extra,
               },
             })
@@ -304,8 +308,13 @@ export function Uploader(props: Props) {
       setError("Add your name so we know who to thank.");
       return;
     }
+    if (props.mode === "guest" && props.offerEmail && email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("That email doesn't look quite right. Leave it empty if you'd rather not get updates.");
+      return;
+    }
     if (props.mode === "guest") {
       save(NAME_KEY, name.trim());
+      if (props.offerEmail) save(EMAIL_KEY, email.trim());
       if (props.requireCode) save(CODE_KEY, code.trim());
     }
 
@@ -415,6 +424,24 @@ export function Uploader(props: Props) {
             maxLength={60}
             autoComplete="name"
             placeholder="e.g. Aunty Sue"
+            className={fieldClass}
+          />
+        </label>
+      )}
+
+      {props.mode === "guest" && props.offerEmail && (
+        <label className="flex flex-col gap-2">
+          <span className="text-[11px] uppercase tracking-[0.3em] text-ivory-dim">
+            Your email <span className="normal-case tracking-normal">(optional)</span>
+          </span>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            maxLength={254}
+            autoComplete="email"
+            inputMode="email"
+            placeholder="We'll tell you when new photos are added"
             className={fieldClass}
           />
         </label>

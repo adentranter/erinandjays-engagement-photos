@@ -9,6 +9,7 @@ import { SiteNav } from "@/components/site-nav";
 import { Uploader } from "@/components/uploader";
 import { LoginForm } from "./login-form";
 import { DeleteButton } from "./delete-button";
+import { EmailUpdates } from "./email-updates";
 import {
   chooseCover,
   logout,
@@ -174,6 +175,8 @@ export default async function PhotographerPage({
           </details>
         )}
       </section>
+
+      <EmailUpdates />
 
       <section className="mt-20">
         <h2 className="mb-6 text-center text-[11px] uppercase tracking-[0.3em] text-ivory-dim">
