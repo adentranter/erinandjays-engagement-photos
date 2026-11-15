@@ -79,13 +79,13 @@ interface QuoteResponse {
 }
 
 /** What Prodigi will charge us for one copy delivered within Australia. */
-export async function quoteBook(pageCount: number): Promise<Quote> {
+export async function quoteBook(sku: string, pageCount: number): Promise<Quote> {
   const cfg = bookConfig();
   const res = await call<QuoteResponse>("POST", "/quotes", {
     shippingMethod: cfg.shippingMethod.toLowerCase(),
     destinationCountryCode: cfg.country,
     currencyCode: cfg.currency,
-    items: [{ sku: cfg.sku, copies: 1, attributes: {}, assets: [{ printArea: "default", pageCount }] }],
+    items: [{ sku, copies: 1, attributes: {}, assets: [{ printArea: "default", pageCount }] }],
   });
   const q = res.quotes?.[0];
   if (!q) throw new ProdigiError(`Prodigi returned no quote (${res.outcome})`);
@@ -108,12 +108,12 @@ export async function quoteBook(pageCount: number): Promise<Quote> {
 }
 
 /** Spine width for this many PDF pages, printed for an Australian address. */
-export async function spineWidthMm(pageCount: number): Promise<number> {
+export async function spineWidthMm(sku: string, pageCount: number): Promise<number> {
   const cfg = bookConfig();
   const res = await call<{ success?: boolean; message?: string; spineInfo?: { widthMm?: number } }>(
     "POST",
     "/products/spine",
-    { sku: cfg.sku, destinationCountryCode: cfg.country, state: "", numberOfPages: pageCount }
+    { sku, destinationCountryCode: cfg.country, state: "", numberOfPages: pageCount }
   );
   const w = Number(res.spineInfo?.widthMm);
   if (!Number.isFinite(w) || w <= 0) {
@@ -124,6 +124,7 @@ export async function spineWidthMm(pageCount: number): Promise<number> {
 
 export interface OrderInput {
   bookId: string;
+  sku: string;
   pageCount: number;
   pdfUrl: string;
   /** Optional: Prodigi prints a plain spine without it */
@@ -185,7 +186,7 @@ export async function createOrder(o: OrderInput): Promise<ProdigiOrder> {
     items: [
       {
         merchantReference: o.bookId,
-        sku: cfg.sku,
+        sku: o.sku,
         copies: 1,
         sizing: "fillPrintArea",
         attributes: {},

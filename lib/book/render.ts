@@ -118,6 +118,7 @@ async function interiorPage(page: Page, format: BookFormat, tmp: string): Promis
   const slots = slotsFor(page.layout, format.widthMm / format.heightMm);
   const composites: sharp.OverlayOptions[] = [];
   for (let i = 0; i < page.photos.length && i < slots.length; i++) {
+    if (!page.photos[i]) continue; // an empty spot prints as plain paper
     const s = slots[i];
     const sx = Math.round(s.x * W);
     const sy = Math.round(s.y * H);

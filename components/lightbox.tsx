@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { GalleryItem } from "@/lib/gallery-types";
 import { MotionVideo } from "@/components/motion-video";
 import { MyUploadActions } from "@/components/my-upload-actions";
+import { rememberViewed } from "@/lib/recent-photos";
 
 interface LightboxProps {
   media: GalleryItem[];
@@ -40,6 +41,11 @@ export function Lightbox({ media, index, onNavigate, onClose }: LightboxProps) {
       document.body.style.overflow = previousOverflow;
     };
   }, [prev, next, onClose]);
+
+  // Remembered for the photo book picker's "Recently viewed" row.
+  useEffect(() => {
+    if (item && item.type !== "video") rememberViewed(item.id);
+  }, [item]);
 
   // Preload neighbouring images so arrowing feels instant
   useEffect(() => {

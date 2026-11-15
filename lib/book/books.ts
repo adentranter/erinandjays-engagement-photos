@@ -5,7 +5,7 @@ import { db, hasDatabase } from "@/lib/db";
 import { getAlbum } from "@/lib/media";
 import type { Album } from "@/lib/gallery-types";
 import { bookConfig, priceFor } from "./config";
-import { flow, isLayoutId, pad, type Page, type PhotoShape } from "./layouts";
+import { FORMATS, formatFor, isLayoutId, pagesOf, type BookFormat, type Page } from "./layouts";
 import { quoteBook, type ProdigiOrder } from "./prodigi";
 import { stripe } from "./stripe";
 
@@ -88,18 +88,30 @@ export async function getBook(id: string): Promise<BookRow | null> {
 
 export interface DraftInput {
   id?: string | null;
+  /** Book size (a Prodigi SKU from FORMATS) */
+  sku: string | null;
   title: string;
   subtitle: string;
+  /** Photo spots, page by page; "" for an empty one */
   photoIds: string[];
   layouts: string[];
   coverId: string | null;
 }
 
 function clean(input: DraftInput) {
+  // Each photo goes in the book once; a repeat becomes an empty spot.
+  const seen = new Set<string>();
+  const spots = (input.photoIds ?? []).slice(0, 1500).map((raw) => {
+    const id = String(raw ?? "");
+    if (!id || seen.has(id)) return "";
+    seen.add(id);
+    return id;
+  });
   return {
+    sku: formatFor(input.sku)?.sku ?? null,
     title: String(input.title ?? "").slice(0, 80),
     subtitle: String(input.subtitle ?? "").slice(0, 120),
-    photoIds: [...new Set((input.photoIds ?? []).map(String))].slice(0, 1500),
+    photoIds: spots,
     layouts: (input.layouts ?? []).map(String).filter(isLayoutId).slice(0, 400),
     coverId: input.coverId ? String(input.coverId) : null,
   };
@@ -144,37 +156,28 @@ async function cancelCheckout(book: BookRow): Promise<void> {
 /* ------------------------------------------------------------------ */
 
 export interface Laid {
+  format: BookFormat;
   pages: Page[];
-  /** Photos that are no longer in the galleries (hidden or deleted) */
-  dropped: number;
+  /** Spots with no photo (including photos since hidden or deleted) */
+  empty: number;
   coverId: string | null;
   /** Interior pages + front and back cover: what Prodigi calls the page count */
   pdfPages: number;
 }
 
 /** Turn a saved book into its final pages, using only photos still public. */
-export function layOut(book: Pick<BookRow, "photoIds" | "layouts" | "coverId">, photos: BookPhoto[]): Laid {
-  const { format } = bookConfig();
-  const byId = new Map(photos.map((p) => [p.id, p]));
-  const shapes: PhotoShape[] = book.photoIds
-    .map((id) => byId.get(id))
-    .filter((p): p is BookPhoto => Boolean(p))
-    .map((p) => ({ id: p.id, aspect: p.aspect }));
-  const flowed = flow(shapes, book.layouts, format);
-  const layouts = pad(
-    // Trailing blanks are re-added by pad as needed.
-    trimBlankTail(flowed.map((p) => p.layout)),
-    format
+export function layOut(book: Pick<BookRow, "sku" | "photoIds" | "layouts" | "coverId">, photos: BookPhoto[]): Laid {
+  const format = formatFor(book.sku);
+  if (!format) throw new BookError("Choose a size for your book first");
+  const ok = new Set(photos.map((p) => p.id));
+  const pages = pagesOf(
+    book.layouts,
+    book.photoIds.map((id) => (ok.has(id) ? id : ""))
   );
-  const pages = flow(shapes, layouts, format);
-  const coverId = book.coverId && byId.has(book.coverId) ? book.coverId : shapes[0]?.id ?? null;
-  return { pages, dropped: book.photoIds.length - shapes.length, coverId, pdfPages: pages.length + 2 };
-}
-
-function trimBlankTail<T extends string>(layouts: T[]): T[] {
-  const out = [...layouts];
-  while (out.length && out[out.length - 1] === "blank") out.pop();
-  return out;
+  const placed = pages.flatMap((p) => p.photos).filter(Boolean);
+  const empty = pages.reduce((n, p) => n + p.photos.filter((x) => !x).length, 0);
+  const coverId = book.coverId && ok.has(book.coverId) ? book.coverId : placed[0] ?? null;
+  return { format, pages, empty, coverId, pdfPages: pages.length + 2 };
 }
 
 export interface PriceCheck {
@@ -185,14 +188,19 @@ export interface PriceCheck {
   currency: string;
 }
 
+function checkPages(laid: Laid) {
+  const { format, pages } = laid;
+  if (pages.length < format.minPages) throw new BookError(`A book needs at least ${format.minPages} pages`);
+  if (pages.length > format.maxPages) {
+    throw new BookError(`That's ${pages.length} pages — the most this book can have is ${format.maxPages}`);
+  }
+}
+
 export async function priceBook(book: BookRow, photos: BookPhoto[]): Promise<PriceCheck> {
   const cfg = bookConfig();
   const laid = layOut(book, photos);
-  if (!laid.pages.some((p) => p.photos.length)) throw new BookError("Add some photos first");
-  if (laid.pages.length > cfg.format.maxPages) {
-    throw new BookError(`That's ${laid.pages.length} pages — the most this book can have is ${cfg.format.maxPages}`);
-  }
-  const quote = await quoteBook(laid.pdfPages);
+  checkPages(laid);
+  const quote = await quoteBook(laid.format.sku, laid.pdfPages);
   return {
     pageCount: laid.pdfPages,
     interiorPages: laid.pages.length,
@@ -202,11 +210,42 @@ export async function priceBook(book: BookRow, photos: BookPhoto[]): Promise<Pri
   };
 }
 
+/** Price of the smallest book in each size, for the size picker. Cached an hour. */
+const fromPrices: { at: number; value: Promise<Record<string, number>> } = { at: 0, value: Promise.resolve({}) };
+export function startingPrices(): Promise<Record<string, number>> {
+  const cfg = bookConfig();
+  if (!cfg.prodigiKey) return Promise.resolve({});
+  if (Date.now() - fromPrices.at < 60 * 60 * 1000) return fromPrices.value;
+  fromPrices.at = Date.now();
+  fromPrices.value = (async () => {
+    const entries = await Promise.all(
+      FORMATS.map(async (f) => {
+        try {
+          const q = await quoteBook(f.sku, f.minPages + 2);
+          return [f.sku, priceFor(q.totalCents, cfg)] as const;
+        } catch (err) {
+          console.warn(`[book] no starting price for ${f.sku}:`, err instanceof Error ? err.message : err);
+          return null;
+        }
+      })
+    );
+    const out = Object.fromEntries(entries.filter((e): e is readonly [string, number] => Boolean(e)));
+    if (!Object.keys(out).length) fromPrices.at = 0; // try again next time
+    return out;
+  })();
+  return fromPrices.value;
+}
+
 /** Quote the book, freeze its layout and price, and open Stripe Checkout. */
 export async function startCheckout(book: BookRow, photos: BookPhoto[], origin: string): Promise<string> {
   const cfg = bookConfig();
   if (book.status === "checkout") await cancelCheckout(book);
   const laid = layOut(book, photos);
+  if (laid.empty) {
+    throw new BookError(
+      `${laid.empty} photo ${laid.empty === 1 ? "spot is" : "spots are"} still empty — fill ${laid.empty === 1 ? "it" : "them"} or change ${laid.empty === 1 ? "that page's" : "those pages'"} layout`
+    );
+  }
   const price = await priceBook(book, photos);
   const title = book.title.trim() || "Our photo book";
 
@@ -221,7 +260,7 @@ export async function startCheckout(book: BookRow, photos: BookPhoto[], origin: 
           unit_amount: price.priceCents,
           product_data: {
             name: `Photo book — ${title}`,
-            description: `${cfg.format.label} · ${price.interiorPages} pages · printed in Australia, delivered to your door`,
+            description: `${laid.format.label} · ${price.interiorPages} pages · printed in Australia, delivered to your door`,
           },
         },
       },
@@ -247,7 +286,7 @@ export async function startCheckout(book: BookRow, photos: BookPhoto[], origin: 
       layouts: laid.pages.map((p) => p.layout),
       photoIds: laid.pages.flatMap((p) => p.photos),
       coverId: laid.coverId,
-      sku: cfg.sku,
+      sku: laid.format.sku,
       pageCount: price.pageCount,
       costCents: price.costCents,
       priceCents: price.priceCents,

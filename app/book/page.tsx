@@ -3,23 +3,19 @@ import Link from "next/link";
 import { SiteNav } from "@/components/site-nav";
 import { BookBuilder, type BuilderPhoto, type SavedBook } from "@/components/book/builder";
 import { currentOwnerHash } from "@/lib/guest";
-import { getCoverIds } from "@/lib/albums";
-import { bookablePhotos, getDraft, listOrders } from "@/lib/book/books";
+import { bookablePhotos, getDraft, listOrders, startingPrices } from "@/lib/book/books";
 import { bookConfig } from "@/lib/book/config";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Ehrin & Jay — Make a photo book" };
 
-/** How many photos a fresh book starts with. */
-const STARTER_PHOTOS = 40;
-
 export default async function BookPage() {
   const ownerHash = await currentOwnerHash();
-  const [photos, draft, orders, covers] = await Promise.all([
+  const [photos, draft, orders, prices] = await Promise.all([
     bookablePhotos().catch(() => []),
     getDraft(ownerHash).catch(() => null),
     listOrders(ownerHash).catch(() => []),
-    getCoverIds(),
+    startingPrices().catch(() => ({})),
   ]);
   const cfg = bookConfig();
 
@@ -32,26 +28,13 @@ export default async function BookPage() {
     credit: p.credit,
   }));
 
-  // A fresh book starts finished: the photographer's wedding set (or
-  // whatever there is), the album cover, and the couple's names.
-  const ids = new Set(photos.map((p) => p.id));
-  const starter = (
-    photos.some((p) => p.album === "wedding" && p.byPhotographer)
-      ? photos.filter((p) => p.album === "wedding" && p.byPhotographer)
-      : photos.some((p) => p.byPhotographer)
-        ? photos.filter((p) => p.byPhotographer)
-        : photos
-  )
-    .slice(0, STARTER_PHOTOS)
-    .map((p) => p.id);
-  const starterCover = [covers.wedding, covers.engagement].find((c) => c && ids.has(c)) ?? starter[0] ?? null;
-
   const saved: SavedBook | null = draft
     ? {
         id: draft.id,
+        sku: draft.sku,
         title: draft.title,
         subtitle: draft.subtitle,
-        photoIds: draft.photoIds.filter((id) => ids.has(id)),
+        photoIds: draft.photoIds,
         layouts: draft.layouts,
         coverId: draft.coverId,
       }
@@ -65,8 +48,8 @@ export default async function BookPage() {
         <h1 className="mt-4 font-display text-5xl font-light italic leading-tight sm:text-6xl">Make a photo book</h1>
         <div aria-hidden className="mx-auto mt-6 h-px w-24 bg-champagne/60" />
         <p className="mx-auto mt-6 max-w-md text-sm font-light leading-relaxed text-ivory-dim">
-          We&rsquo;ve laid one out for you. Tap any photo to swap or remove it, change a page&rsquo;s
-          layout, or add more from the galleries — it saves as you go.
+          Pick a size and a design, then tap each empty spot to choose its photo. Change any
+          page&rsquo;s layout as you go — it saves automatically.
         </p>
         {orders.length > 0 && (
           <p className="mt-6 text-[11px] uppercase tracking-[0.3em] text-ivory-dim">
@@ -90,14 +73,9 @@ export default async function BookPage() {
       ) : (
         <BookBuilder
           photos={builderPhotos}
-          format={cfg.format}
           saved={saved}
-          starter={{
-            title: "Ehrin & Jay",
-            subtitle: process.env.WEDDING_DETAILS?.trim() ?? "",
-            photoIds: starter,
-            coverId: starterCover,
-          }}
+          defaults={{ title: "Ehrin & Jay", subtitle: process.env.WEDDING_DETAILS?.trim() ?? "" }}
+          prices={prices}
           canPrice={Boolean(cfg.prodigiKey)}
           canOrder={cfg.missing.length === 0}
         />

@@ -1,9 +1,8 @@
 import "server-only";
-import type { BookFormat } from "./layouts";
 
 /**
- * Photo book settings, all from env so a new wedding (or a different book
- * size) needs no code change. See .env.example → "Photo books".
+ * Photo book settings from env. See .env.example → "Photo books". Book
+ * sizes live in lib/book/layouts.ts (FORMATS).
  */
 
 function num(name: string, fallback: number): number {
@@ -21,21 +20,12 @@ export function bookConfig() {
     !stripeWebhookSecret && "STRIPE_WEBHOOK_SECRET",
   ].filter(Boolean) as string[];
 
-  const format: BookFormat = {
-    label: process.env.BOOK_LABEL?.trim() || "Hardcover photo book · A4",
-    widthMm: num("BOOK_WIDTH_MM", 210),
-    heightMm: num("BOOK_HEIGHT_MM", 297),
-    minPages: num("BOOK_MIN_PAGES", 24),
-    maxPages: num("BOOK_MAX_PAGES", 300),
-  };
-
   return {
     prodigiKey,
     /** "live" places real orders that get printed and billed */
     prodigiLive: process.env.PRODIGI_ENV?.trim() === "live",
     /** Shared secret in the callback URL Prodigi posts status updates to */
     prodigiCallbackSecret: process.env.PRODIGI_CALLBACK_SECRET?.trim() || null,
-    sku: process.env.PRODIGI_BOOK_SKU?.trim() || "BOOK-FE-A4-P-HARD-G",
     /** Budget | Standard | StandardPlus | Express | Overnight */
     shippingMethod: process.env.PRODIGI_SHIPPING?.trim() || "Standard",
     country: "AU",
@@ -48,7 +38,6 @@ export function bookConfig() {
      */
     marginPercent: num("BOOK_MARGIN_PERCENT", 0),
     marginFlatCents: Math.round(num("BOOK_MARGIN_FLAT", 0) * 100),
-    format,
     missing,
   };
 }

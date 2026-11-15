@@ -8,6 +8,7 @@ import { bookConfig } from "./config";
 import { emailOrderPlaced } from "./email";
 import { createOrder, spineWidthMm } from "./prodigi";
 import { renderBookPdf, renderSpinePdf } from "./render";
+import { formatFor } from "./layouts";
 
 /**
  * Turns paid books into Prodigi orders: render the print PDFs, store them
@@ -80,6 +81,8 @@ async function claim(): Promise<string | null> {
 async function submit(id: string): Promise<void> {
   const book = await db.photoBook.findUniqueOrThrow({ where: { id } });
   const cfg = bookConfig();
+  const format = formatFor(book.sku);
+  if (!format) throw new Error(`Unknown book size ${book.sku}`);
   const started = Date.now();
 
   let { pdfUrl, spineUrl } = book;
@@ -96,15 +99,15 @@ async function submit(id: string): Promise<void> {
       subtitle: book.subtitle,
       coverId: laid.coverId,
       pages: laid.pages,
-      format: cfg.format,
+      format,
     });
     // The spine is optional, and Prodigi can't size it for every lab (it
     // can't for Australia): without a width the book goes without one.
-    const width = await spineWidthMm(pdf.pages).catch((err) => {
+    const width = await spineWidthMm(format.sku, pdf.pages).catch((err) => {
       console.warn(`[book] ${id}: no spine artwork —`, err instanceof Error ? err.message : err);
       return null;
     });
-    const spinePath = width ? await renderSpinePdf(book.title, width, cfg.format) : null;
+    const spinePath = width ? await renderSpinePdf(book.title, width, format) : null;
     try {
       const stored = await storeFiles([
         { path: pdf.path, name: `book-${id}.pdf`, type: "application/pdf" },
@@ -130,6 +133,7 @@ async function submit(id: string): Promise<void> {
   const site = emailConfig().siteUrl;
   const order = await createOrder({
     bookId: id,
+    sku: format.sku,
     pageCount: fresh.pageCount!,
     pdfUrl: pdfUrl!,
     spineUrl,

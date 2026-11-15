@@ -2,10 +2,10 @@
  * Photo book page layouts, shared by the builder (browser preview) and the
  * print renderer (lib/book/render.ts), so what people see is what prints.
  *
- * A book is an ordered list of photo ids plus one layout name per interior
- * page. Photos flow through the pages in order, each page taking as many
- * photos as its layout has slots. Changing one page's layout re-flows the
- * pages after it (see `relayoutFrom`).
+ * A book is one layout per interior page plus a flat list of photo spots:
+ * page 1's spots first, then page 2's, and so on, with "" for a spot not
+ * filled yet. People fill spots one at a time; nothing is laid out for
+ * them automatically.
  */
 
 /** Position on the page as fractions of its width/height (0–1). */
@@ -84,129 +84,156 @@ export function slotsFor(layout: LayoutId, pageAspect: number): Box[] {
   return slots.map((b) => ({ x: b.y, y: b.x, w: b.h, h: b.w }));
 }
 
-/** Page size and limits for the book being sold (from lib/book/config.ts). */
+/** A book size we sell, printed by Prodigi in Australia. */
 export interface BookFormat {
-  label: string;
+  /** Prodigi SKU — also what's saved on the book */
+  sku: string;
+  size: "A4" | "A5";
+  orientation: "portrait" | "landscape";
+  cover: "hardcover" | "softcover";
   widthMm: number;
   heightMm: number;
   /** Fewest interior pages the printer accepts */
   minPages: number;
   maxPages: number;
+  label: string;
 }
 
-export interface PhotoShape {
-  id: string;
-  /** width / height; 1.5 when unknown */
-  aspect: number;
+function format(
+  sku: string,
+  size: BookFormat["size"],
+  orientation: BookFormat["orientation"],
+  cover: BookFormat["cover"]
+): BookFormat {
+  const [long, short] = size === "A4" ? [297, 210] : [210, 148];
+  const portrait = orientation === "portrait";
+  return {
+    sku,
+    size,
+    orientation,
+    cover,
+    widthMm: portrait ? short : long,
+    heightMm: portrait ? long : short,
+    minPages: 24,
+    maxPages: 300,
+    label: `${cover === "hardcover" ? "Hardcover" : "Softcover"} · ${size} ${orientation}`,
+  };
 }
+
+/** Every size Prodigi prints and ships within Australia (checked Nov 2026). */
+export const FORMATS: BookFormat[] = [
+  format("BOOK-FE-A4-P-HARD-G", "A4", "portrait", "hardcover"),
+  format("BOOK-FE-A4-L-HARD-G", "A4", "landscape", "hardcover"),
+  format("BOOK-FE-A5-P-HARD-G", "A5", "portrait", "hardcover"),
+  format("BOOK-FE-A5-L-HARD-G", "A5", "landscape", "hardcover"),
+  format("BOOK-FE-A4-P-SOFT-G", "A4", "portrait", "softcover"),
+  format("BOOK-FE-A5-P-SOFT-G", "A5", "portrait", "softcover"),
+];
+
+export function formatFor(sku: string | null | undefined): BookFormat | null {
+  return FORMATS.find((f) => f.sku === sku) ?? null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Designs: a starting set of empty pages                              */
+/* ------------------------------------------------------------------ */
+
+export interface Design {
+  id: string;
+  name: string;
+  blurb: string;
+  pages: number;
+  /** Repeated to fill the pages */
+  pattern: LayoutId[];
+}
+
+export const DESIGNS: Design[] = [
+  {
+    id: "classic",
+    name: "Classic",
+    blurb: "One photo to a page, room to breathe",
+    pages: 24,
+    pattern: ["full", "framed", "full", "duo", "framed", "full"],
+  },
+  {
+    id: "story",
+    name: "Story",
+    blurb: "A mix of big moments and small ones",
+    pages: 40,
+    pattern: ["full", "duo", "framed", "trio", "full", "quad", "framed", "duo"],
+  },
+  {
+    id: "collection",
+    name: "Collection",
+    blurb: "Lots of photos, several to a page",
+    pages: 60,
+    pattern: ["quad", "full", "trio", "quad", "duo", "framed"],
+  },
+];
+
+export function designLayouts(design: Design): LayoutId[] {
+  return Array.from({ length: design.pages }, (_, i) => design.pattern[i % design.pattern.length]);
+}
+
+/** Photo spots a design gives, for "24 pages · 30 photos". */
+export function designSpots(design: Design): number {
+  return designLayouts(design).reduce((n, l) => n + LAYOUTS[l].slots.length, 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* Pages and spots                                                     */
+/* ------------------------------------------------------------------ */
 
 export interface Page {
   layout: LayoutId;
-  /** One per filled slot, in slot order */
+  /** One per slot, in slot order; "" is an empty spot */
   photos: string[];
 }
 
-/** Lay the photos into pages using `layouts`, adding pages if they run out. */
-export function flow(photos: PhotoShape[], layouts: string[], format: BookFormat): Page[] {
-  const pages: Page[] = [];
+const asLayout = (l: string): LayoutId => (isLayoutId(l) ? l : "framed");
+
+/** Split the flat spot list into pages. Missing spots come back empty. */
+export function pagesOf(layouts: string[], spots: string[]): Page[] {
   let i = 0;
-  for (const raw of layouts) {
-    const layout = isLayoutId(raw) ? raw : "framed";
+  return layouts.map((raw) => {
+    const layout = asLayout(raw);
     const n = LAYOUTS[layout].slots.length;
-    pages.push({ layout, photos: photos.slice(i, i + n).map((p) => p.id) });
+    const photos = Array.from({ length: n }, (_, k) => spots[i + k] ?? "");
     i += n;
-  }
-  if (i < photos.length) {
-    const extra = autoLayouts(photos.slice(i), format);
-    return flow(photos, [...layouts.filter(isLayoutId), ...extra], format);
-  }
-  return pages;
+    return { layout, photos };
+  });
+}
+
+/** Back to the flat lists that get saved. */
+export function flatten(pages: Page[]): { layouts: LayoutId[]; spots: string[] } {
+  return { layouts: pages.map((p) => p.layout), spots: pages.flatMap((p) => p.photos) };
 }
 
 /**
- * Pick layouts for these photos: photos that match the page's shape get a
- * full-bleed page, photos of the other shape pair up, and every sixth page
- * is a four-up to keep it moving.
+ * Change one page's layout. Its photos stay in order; if the new layout has
+ * fewer spots, the extras come off the page (they're still in the gallery).
  */
-export function autoLayouts(photos: PhotoShape[], format: BookFormat): LayoutId[] {
-  const pageAspect = format.widthMm / format.heightMm;
-  const portraitPage = pageAspect < 0.95;
-  const landscapePage = pageAspect > 1.05;
-  const out: LayoutId[] = [];
+export function withLayout(pages: Page[], index: number, layout: LayoutId): Page[] {
+  return pages.map((p, i) => {
+    if (i !== index) return p;
+    const n = LAYOUTS[layout].slots.length;
+    const kept = p.photos.filter(Boolean);
+    return { layout, photos: Array.from({ length: n }, (_, k) => kept[k] ?? "") };
+  });
+}
+
+/**
+ * New pages for a different design, carrying the photos already placed
+ * across in order so switching design never loses work that fits.
+ */
+export function redesign(pages: Page[], layouts: LayoutId[]): Page[] {
+  const placed = pages.flatMap((p) => p.photos).filter(Boolean);
   let i = 0;
-  while (i < photos.length) {
-    const left = photos.length - i;
-    const p = photos[i];
-    const tall = p.aspect < 0.95;
-    const wide = p.aspect > 1.05;
-    const nextWide = i + 1 < photos.length && photos[i + 1].aspect > 1.05;
-
-    if (out.length % 6 === 5 && left >= 4) {
-      out.push("quad");
-      i += 4;
-    } else if (wide && nextWide && portraitPage) {
-      out.push("duo");
-      i += 2;
-    } else if (tall && i + 1 < photos.length && photos[i + 1].aspect < 0.95 && landscapePage) {
-      out.push("duo");
-      i += 2;
-    } else if ((tall && portraitPage) || (wide && landscapePage)) {
-      out.push("full");
-      i += 1;
-    } else {
-      out.push("framed");
-      i += 1;
-    }
-  }
-  return out;
-}
-
-/** Split multi-photo pages until there are `min` pages (or nothing to split). */
-export function stretch(layouts: LayoutId[], min: number): LayoutId[] {
-  const out = [...layouts];
-  while (out.length < min) {
-    const at = out.findIndex((l) => LAYOUTS[l].slots.length > 1);
-    if (at < 0) break;
-    const n = LAYOUTS[out[at]].slots.length;
-    out.splice(at, 1, ...Array<LayoutId>(n).fill("framed"));
-  }
-  return out;
-}
-
-/** Pad with blank pages to the minimum and to an even count. */
-export function pad(layouts: LayoutId[], format: BookFormat): LayoutId[] {
-  const out = [...layouts];
-  while (out.length < format.minPages || out.length % 2 !== 0) out.push("blank");
-  return out;
-}
-
-/** Fresh layout for a whole book. */
-export function layoutBook(photos: PhotoShape[], format: BookFormat): LayoutId[] {
-  return pad(stretch(autoLayouts(photos, format), format.minPages), format);
-}
-
-/**
- * Change page `index` to `layout` and re-flow every page after it,
- * keeping the pages before it untouched.
- */
-export function relayoutFrom(
-  photos: PhotoShape[],
-  layouts: string[],
-  index: number,
-  layout: LayoutId,
-  format: BookFormat
-): LayoutId[] {
-  const before = layouts.slice(0, index).map((l) => (isLayoutId(l) ? l : "framed"));
-  const used = before.reduce((n, l) => n + LAYOUTS[l].slots.length, 0) + LAYOUTS[layout].slots.length;
-  const rest = autoLayouts(photos.slice(used), format);
-  return pad([...before, layout, ...rest], format);
-}
-
-/** Drop trailing blank pages beyond what's needed, then re-pad. */
-export function tidy(layouts: string[], format: BookFormat): LayoutId[] {
-  const out = layouts.filter(isLayoutId);
-  while (out.length && out[out.length - 1] === "blank") out.pop();
-  return pad(out, format);
+  return layouts.map((layout) => {
+    const n = LAYOUTS[layout].slots.length;
+    const photos = Array.from({ length: n }, () => placed[i++] ?? "");
+    return { layout, photos };
+  });
 }
 
 /** How a photo of `aspect` sits in a slot of `slotAspect` (fractions of the slot). */
@@ -223,25 +250,4 @@ export function placeInSlot(
   }
   const w = aspect / slotAspect;
   return { x: (1 - w) / 2, y: 0, w, h: 1 };
-}
-
-function trimBlankTail(layouts: LayoutId[]): LayoutId[] {
-  const out = [...layouts];
-  while (out.length && out[out.length - 1] === "blank") out.pop();
-  return out;
-}
-
-/**
- * Keep pages before `index` as they are and lay out every photo after them
- * afresh. Used when photos are added or removed, so earlier pages the
- * person may have arranged don't shuffle.
- */
-export function relayoutAfter(photos: PhotoShape[], layouts: string[], index: number, format: BookFormat): LayoutId[] {
-  const before = layouts.slice(0, Math.max(0, index)).map((l) => (isLayoutId(l) ? l : "framed"));
-  const pages = flow(photos, before, format);
-  // Pages before `index` may have lost their photos (e.g. removed ones).
-  const kept = pages.filter((p) => p.layout === "blank" || p.photos.length).map((p) => p.layout);
-  const used = kept.reduce((n, l) => n + LAYOUTS[l].slots.length, 0);
-  const rest = autoLayouts(photos.slice(used), format);
-  return pad(stretch(trimBlankTail([...kept, ...rest]), format.minPages), format);
 }

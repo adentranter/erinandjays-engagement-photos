@@ -5,22 +5,27 @@ import type { BuilderPhoto } from "./builder";
 
 /**
  * One interior page as it will print: same slot geometry as the print
- * renderer (lib/book/render.ts), drawn with the gallery thumbnails.
+ * renderer (lib/book/render.ts), drawn with the gallery thumbnails. Empty
+ * spots are buttons that open the photo picker.
  */
 export function PageView({
   page,
+  pageNumber,
   format,
   photos,
-  selectedId,
-  swapping,
-  onPhoto,
+  selectedSlot,
+  moving,
+  onSpot,
 }: {
   page: Page;
+  pageNumber: number;
   format: BookFormat;
   photos: Map<string, BuilderPhoto>;
-  selectedId: string | null;
-  swapping: boolean;
-  onPhoto: (id: string) => void;
+  /** Slot on this page that's selected, if any */
+  selectedSlot: number | null;
+  /** Something is being moved: every spot is a drop target */
+  moving: boolean;
+  onSpot: (slot: number) => void;
 }) {
   const layout = LAYOUTS[page.layout];
   const slots = slotsFor(page.layout, format.widthMm / format.heightMm);
@@ -32,7 +37,8 @@ export function PageView({
       {slots.map((s, i) => {
         const id = page.photos[i];
         const photo = id ? photos.get(id) : undefined;
-        const selected = id && id === selectedId;
+        const selected = selectedSlot === i;
+        const where = slots.length > 1 ? `spot ${i + 1} on page ${pageNumber}` : `page ${pageNumber}`;
         return (
           <div
             key={i}
@@ -42,11 +48,11 @@ export function PageView({
             {photo ? (
               <button
                 type="button"
-                onClick={() => onPhoto(photo.id)}
-                aria-label={selected ? "Selected photo" : "Select photo"}
-                aria-pressed={Boolean(selected)}
+                onClick={() => onSpot(i)}
+                aria-label={moving ? `Move here: ${where}` : `Photo on ${where}`}
+                aria-pressed={selected}
                 className={`group relative block h-full w-full overflow-hidden outline-none ${
-                  swapping && !selected ? "cursor-copy" : "cursor-pointer"
+                  moving && !selected ? "cursor-copy" : "cursor-pointer"
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -56,7 +62,7 @@ export function PageView({
                   loading="lazy"
                   draggable={false}
                   className={`h-full w-full ${layout.fit === "contain" ? "object-contain" : "object-cover"} transition-opacity duration-200 ${
-                    swapping && !selected ? "group-hover:opacity-70" : ""
+                    moving && !selected ? "group-hover:opacity-70" : ""
                   }`}
                 />
                 <span
@@ -69,7 +75,23 @@ export function PageView({
                 />
               </button>
             ) : (
-              <div className="h-full w-full border border-dashed border-black/10" />
+              <button
+                type="button"
+                onClick={() => onSpot(i)}
+                aria-label={moving ? `Move here: ${where}` : `Add a photo to ${where}`}
+                className={`group grid h-full w-full place-items-center border border-dashed outline-none transition-colors ${
+                  moving
+                    ? "border-champagne/70 bg-champagne/10"
+                    : "border-black/20 bg-black/[0.03] hover:border-champagne hover:bg-champagne/10 focus-visible:border-champagne"
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className="grid h-7 w-7 place-items-center rounded-full border border-black/25 text-base leading-none text-black/40 transition-colors group-hover:border-champagne group-hover:bg-champagne group-hover:text-ink"
+                >
+                  +
+                </span>
+              </button>
             )}
           </div>
         );
@@ -79,9 +101,9 @@ export function PageView({
 }
 
 /** Tiny diagram of a layout, for the page layout picker. */
-export function LayoutIcon({ id, aspect }: { id: LayoutId; aspect: number }) {
-  const w = aspect >= 1 ? 22 : 22 * aspect;
-  const h = aspect >= 1 ? 22 / aspect : 22;
+export function LayoutIcon({ id, aspect, size = 22 }: { id: LayoutId; aspect: number; size?: number }) {
+  const w = aspect >= 1 ? size : size * aspect;
+  const h = aspect >= 1 ? size / aspect : size;
   const slots = slotsFor(id, aspect);
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden className="block">
