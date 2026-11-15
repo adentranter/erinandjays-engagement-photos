@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 /**
  * Give each browser a private "guest owner" cookie before it uploads, so it
  * can manage its own uploads later (lib/guest.ts). Only set on /upload,
- * which is where guests upload from.
+ * where guests upload from, and /book, where photo books are saved to it.
  */
 const OWNER_COOKIE = "guest_owner";
 
@@ -25,4 +25,4 @@ export function middleware(req: NextRequest) {
   return res;
 }
 
-export const config = { matcher: ["/upload"] };
+export const config = { matcher: ["/upload", "/book"] };

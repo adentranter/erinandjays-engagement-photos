@@ -142,3 +142,73 @@ model NotificationSettings {
 
   @@map("notification_settings")
 }
+
+enum BookStatus {
+  /// Being put together in /book
+  draft
+  /// Sent to Stripe Checkout, not paid yet
+  checkout
+  /// Paid; waiting for the print file to be made and sent to Prodigi
+  paid
+  /// Print file being made / order being placed (claimed by a worker)
+  rendering
+  /// Order placed with Prodigi
+  submitted
+  in_production
+  shipped
+  cancelled
+  /// Paid but couldn't be placed — retry from the studio
+  failed
+}
+
+/// A photo book someone is building, and later the order for it.
+model PhotoBook {
+  id             String     @id @default(uuid()) @db.Uuid
+  /// Guest browser that made it (lib/guest.ts)
+  ownerTokenHash String?    @map("owner_token_hash")
+  status         BookStatus @default(draft)
+  title          String     @default("")
+  subtitle       String     @default("")
+  /// Gallery item ids (media uuid or "file:<name>") in book order
+  photoIds       String[]   @default([]) @map("photo_ids")
+  /// Layout name per interior page; photos flow through them in order
+  layouts        String[]   @default([])
+  coverId        String?    @map("cover_id")
+
+  /// Snapshot when checkout starts
+  sku            String?
+  pageCount      Int?    @map("page_count")
+  /// Prodigi's quoted total (print + shipping + tax), in cents
+  costCents      Int?    @map("cost_cents")
+  /// What the customer paid, in cents
+  priceCents     Int?    @map("price_cents")
+  currency       String  @default("aud")
+  shippingMethod String? @map("shipping_method")
+
+  stripeSessionId String? @unique @map("stripe_session_id")
+  stripePaymentId String? @map("stripe_payment_id")
+  customerEmail   String? @map("customer_email")
+  customerName    String? @map("customer_name")
+  customerPhone   String? @map("customer_phone")
+  /// Stripe address: line1, line2, city, state, postal_code, country
+  shippingAddress Json?   @map("shipping_address")
+
+  pdfUrl         String?   @map("pdf_url")
+  spineUrl       String?   @map("spine_url")
+  fileKeys       String[]  @default([]) @map("file_keys")
+  prodigiOrderId String?   @unique @map("prodigi_order_id")
+  trackingUrl    String?   @map("tracking_url")
+  trackingNumber String?   @map("tracking_number")
+  error          String?
+  attempts       Int       @default(0)
+  lockedAt       DateTime? @map("locked_at") @db.Timestamptz(6)
+  paidAt         DateTime? @map("paid_at") @db.Timestamptz(6)
+  submittedAt    DateTime? @map("submitted_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([ownerTokenHash, status])
+  @@index([status])
+  @@map("photo_books")
+}

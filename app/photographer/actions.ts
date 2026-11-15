@@ -124,3 +124,10 @@ export async function sendTestEmailAction(
   await requirePhotographer();
   return sendTestEmail();
 }
+
+export async function retryBookAction(form: FormData) {
+  await requirePhotographer();
+  const { retryBook } = await import("@/lib/book/worker");
+  await retryBook(String(form.get("id") ?? ""));
+  revalidatePath("/photographer");
+}

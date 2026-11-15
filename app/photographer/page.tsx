@@ -10,6 +10,7 @@ import { Uploader } from "@/components/uploader";
 import { LoginForm } from "./login-form";
 import { DeleteButton } from "./delete-button";
 import { EmailUpdates } from "./email-updates";
+import { BookOrders } from "./book-orders";
 import {
   chooseCover,
   logout,
@@ -177,6 +178,8 @@ export default async function PhotographerPage({
       </section>
 
       <EmailUpdates />
+
+      <BookOrders />
 
       <section className="mt-20">
         <h2 className="mb-6 text-center text-[11px] uppercase tracking-[0.3em] text-ivory-dim">

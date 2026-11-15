@@ -26,6 +26,8 @@ ENV PHOTOS_DIR=/photos
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
+# Fonts embedded in photo book print files (lib/book/render.ts)
+COPY --from=build /app/assets ./assets
 COPY --from=build /app/photos /photos
 COPY --from=build /app/prisma ./prisma
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

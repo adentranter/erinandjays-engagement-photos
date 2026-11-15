@@ -4,6 +4,7 @@ const LINKS = [
   { href: "/wedding", label: "Wedding", short: "Wedding" },
   { href: "/engagement", label: "Engagement", short: "Engagement" },
   { href: "/upload", label: "Share photos", short: "Share" },
+  { href: "/book", label: "Photo book", short: "Book" },
 ] as const;
 
 export function SiteNav({ current }: { current?: string }) {
