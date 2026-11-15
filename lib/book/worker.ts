@@ -85,7 +85,7 @@ async function submit(id: string): Promise<void> {
   let { pdfUrl, spineUrl } = book;
   const keys = [...book.fileKeys];
 
-  if (!pdfUrl || !spineUrl) {
+  if (!pdfUrl) {
     // The layout was frozen at checkout; photos removed since then are skipped.
     const laid = layOut(book, await bookablePhotos());
     if (laid.pdfPages !== book.pageCount) {
@@ -98,21 +98,27 @@ async function submit(id: string): Promise<void> {
       pages: laid.pages,
       format: cfg.format,
     });
-    const spinePath = await renderSpinePdf(book.title, await spineWidthMm(pdf.pages), cfg.format);
+    // The spine is optional, and Prodigi can't size it for every lab (it
+    // can't for Australia): without a width the book goes without one.
+    const width = await spineWidthMm(pdf.pages).catch((err) => {
+      console.warn(`[book] ${id}: no spine artwork —`, err instanceof Error ? err.message : err);
+      return null;
+    });
+    const spinePath = width ? await renderSpinePdf(book.title, width, cfg.format) : null;
     try {
       const stored = await storeFiles([
         { path: pdf.path, name: `book-${id}.pdf`, type: "application/pdf" },
-        { path: spinePath, name: `book-${id}.spine.pdf`, type: "application/pdf" },
+        ...(spinePath ? [{ path: spinePath, name: `book-${id}.spine.pdf`, type: "application/pdf" }] : []),
       ]);
       pdfUrl = stored[0].url;
-      spineUrl = stored[1].url;
+      spineUrl = stored[1]?.url ?? null;
       keys.push(...stored.map((s) => s.key));
       await db.photoBook.update({
         where: { id },
         data: { pdfUrl, spineUrl, fileKeys: keys, pageCount: pdf.pages },
       });
     } finally {
-      await Promise.all([fs.rm(pdf.path, { force: true }), fs.rm(spinePath, { force: true })]);
+      await Promise.all([fs.rm(pdf.path, { force: true }), spinePath && fs.rm(spinePath, { force: true })]);
     }
     console.log(`[book] ${id}: rendered ${pdf.pages} pages in ${((Date.now() - started) / 1000).toFixed(0)}s`);
   }
@@ -126,7 +132,7 @@ async function submit(id: string): Promise<void> {
     bookId: id,
     pageCount: fresh.pageCount!,
     pdfUrl: pdfUrl!,
-    spineUrl: spineUrl!,
+    spineUrl,
     callbackUrl:
       site && cfg.prodigiCallbackSecret
         ? `${site}/api/book/prodigi?key=${encodeURIComponent(cfg.prodigiCallbackSecret)}`

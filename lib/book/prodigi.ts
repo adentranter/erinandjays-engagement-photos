@@ -12,7 +12,11 @@ import { bookConfig } from "./config";
  * Things Prodigi's docs leave open, checked against the sandbox before go-live:
  *  - pageCount is the PDF's page count including the two cover pages.
  *  - The cover and interior go in one PDF ("default" print area); the spine
- *    is its own PDF ("spine" print area).
+ *    is its own, optional PDF ("spine" print area).
+ *
+ * Checked against the live API (Nov 2026, A4 portrait hardcover to AU):
+ * printed in Australia (lab au7), AUD quotes, 24 pages minimum, $0.35 a page
+ * after that, and /products/spine isn't available for Australian delivery.
  */
 
 const LIVE = "https://api.prodigi.com/v4.0";
@@ -122,7 +126,8 @@ export interface OrderInput {
   bookId: string;
   pageCount: number;
   pdfUrl: string;
-  spineUrl: string;
+  /** Optional: Prodigi prints a plain spine without it */
+  spineUrl: string | null;
   callbackUrl: string | null;
   recipient: {
     name: string;
@@ -186,7 +191,7 @@ export async function createOrder(o: OrderInput): Promise<ProdigiOrder> {
         attributes: {},
         assets: [
           { printArea: "default", url: o.pdfUrl, pageCount: o.pageCount },
-          { printArea: "spine", url: o.spineUrl },
+          ...(o.spineUrl ? [{ printArea: "spine", url: o.spineUrl }] : []),
         ],
       },
     ],

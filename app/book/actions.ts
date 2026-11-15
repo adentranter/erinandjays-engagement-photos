@@ -51,7 +51,8 @@ export async function priceBookAction(
   id: string
 ): Promise<Result<{ pageCount: number; priceCents: number; currency: string }>> {
   try {
-    if (bookConfig().missing.length) throw new BookError("Ordering isn't switched on yet");
+    // Pricing only needs Prodigi, so the price shows before Stripe is set up.
+    if (!bookConfig().prodigiKey) throw new BookError("Ordering isn't switched on yet");
     const price = await priceBook(await ownedBook(id), await bookablePhotos());
     return { ok: true, value: { pageCount: price.interiorPages, priceCents: price.priceCents, currency: price.currency } };
   } catch (err) {

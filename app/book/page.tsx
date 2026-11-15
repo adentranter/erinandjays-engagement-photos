@@ -98,6 +98,7 @@ export default async function BookPage() {
             photoIds: starter,
             coverId: starterCover,
           }}
+          canPrice={Boolean(cfg.prodigiKey)}
           canOrder={cfg.missing.length === 0}
         />
       )}

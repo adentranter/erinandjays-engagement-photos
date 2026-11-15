@@ -59,12 +59,16 @@ export function BookBuilder({
   format,
   saved,
   starter,
+  canPrice,
   canOrder,
 }: {
   photos: BuilderPhoto[];
   format: BookFormat;
   saved: SavedBook | null;
   starter: { title: string; subtitle: string; photoIds: string[]; coverId: string | null };
+  /** Prodigi is set up, so the book can be priced */
+  canPrice: boolean;
+  /** Stripe is set up too, so it can be ordered */
   canOrder: boolean;
 }) {
   const byId = useMemo(() => new Map(photos.map((p) => [p.id, p])), [photos]);
@@ -156,16 +160,16 @@ export function BookBuilder({
     return () => clearTimeout(t);
   }, [version, saveNow]);
 
-  // With ordering on, save the starter book straight away so it has a price.
+  // With pricing on, save the starter book straight away so it has a price.
   useEffect(() => {
-    if (canOrder && !saved) void saveNow();
-  }, [canOrder, saved, saveNow]);
+    if (canPrice && !saved) void saveNow();
+  }, [canPrice, saved, saveNow]);
 
   /* ---------------- price ---------------- */
 
   const pageCount = pages.length;
   useEffect(() => {
-    if (!canOrder || !id || saveState !== "saved") return;
+    if (!canPrice || !id || saveState !== "saved") return;
     if (price?.pageCount === pageCount) return;
     let live = true;
     const t = setTimeout(async () => {
@@ -180,7 +184,7 @@ export function BookBuilder({
       live = false;
       clearTimeout(t);
     };
-  }, [canOrder, id, saveState, pageCount, price?.pageCount]);
+  }, [canPrice, id, saveState, pageCount, price?.pageCount]);
 
   /* ---------------- edits ---------------- */
 
@@ -468,11 +472,11 @@ export function BookBuilder({
             </button>
           ) : (
             <span className="shrink-0 text-right text-[11px] uppercase tracking-[0.2em] text-ivory-dim">
-              Ordering opens soon
+              {price && !pricing ? `${money(price.priceCents, price.currency)} · ordering opens soon` : "Ordering opens soon"}
             </span>
           )}
         </div>
-        {canOrder && price && !pricing && (
+        {price && !pricing && (
           <p className="-mt-2 pb-3 text-center text-[10px] text-ivory-dim">
             Printed in Australia and delivered to your door · price is exactly what the printer charges
           </p>
