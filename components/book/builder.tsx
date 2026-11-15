@@ -543,7 +543,10 @@ function PhotoDrawer({
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-1 overflow-y-auto px-4 pb-6 sm:grid-cols-6 sm:px-8 lg:grid-cols-8">
+        {/* The scroller wraps the grid: a grid that scrolls itself inside a
+            height-capped column gets its rows squashed and the tiles overlap. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 sm:px-8">
+          <div className="grid grid-cols-4 gap-1 sm:grid-cols-6 lg:grid-cols-8">
           {list.map((p) => {
             const on = inBook.has(p.id);
             return (
@@ -570,6 +573,7 @@ function PhotoDrawer({
               </button>
             );
           })}
+          </div>
         </div>
       </div>
     </div>
